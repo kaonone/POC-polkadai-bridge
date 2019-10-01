@@ -1,0 +1,21 @@
+[lib]
+crate-type = ['cdylib']
+
+[features]
+default = []
+std = ['erc20-substrate-bridge-runtime/std']
+
+[workspace]
+members = []
+[profile.release]
+lto = true
+panic = 'abort'
+
+[package]
+authors = ['Akropolis <admin@akropolis.io>']
+edition = '2018'
+name = 'erc20-substrate-bridge-runtime-wasm'
+version = '1.0.0'
+[dependencies.erc20-substrate-bridge-runtime]
+default-features = false
+path = '..'

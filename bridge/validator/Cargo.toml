@@ -1,0 +1,61 @@
+[package]
+name = "validator"
+version = "0.1.0"
+authors = ["Andrei Orlov <aaorlov1@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+web3 = "0.8.0"
+tokio = "0.1.22"
+tokio-threadpool = "0.1.15"
+futures = "0.1.29"
+rustc-hex = "2.0.1"
+ethabi = "8.0.1"
+log = "0.4.0"
+env_logger = "0.6.2"
+dotenv = "0.14.1"
+
+node-runtime = { path = '../../runtime/', package = 'erc20-substrate-bridge-runtime' }
+
+substrate-bip39 = { path = 'vendor/substrate-bip39' }
+substrate-api-client = { path = 'vendor/substrate-api-client' }
+raw-transaction-builder = { path = 'raw-transaction-builder' }
+
+[dependencies.consensus]
+git = 'https://github.com/paritytech/substrate.git'
+package = 'substrate-consensus-aura'
+rev = 'fc206f3a009b64fc746202e5b4c701bf7e24d1f1'
+
+[dependencies.system]
+default_features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'srml-system'
+rev = 'fc206f3a009b64fc746202e5b4c701bf7e24d1f1'
+
+[dependencies.balances]
+default_features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'srml-balances'
+rev = 'fc206f3a009b64fc746202e5b4c701bf7e24d1f1'
+
+[dependencies.primitives]
+default_features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'substrate-primitives'
+rev = 'fc206f3a009b64fc746202e5b4c701bf7e24d1f1'
+
+[dependencies.runtime-primitives]
+default_features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'sr-primitives'
+rev = 'fc206f3a009b64fc746202e5b4c701bf7e24d1f1'
+
+[dependencies.parity-codec]
+default-features = false
+features = ['derive']
+version = '3.5'
+
+[patch.'https://github.com/paritytech/substrate-bip39']
+substrate-bip39 = { path="vendor/substrate-bip39" }

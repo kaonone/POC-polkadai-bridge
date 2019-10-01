@@ -1,0 +1,1664 @@
+[
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "validatorsGeneration",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "allOperations",
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "votesMaskByOperation",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "validatorsIndices",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "howManyValidatorsDecide",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "votesCountByOperation",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "allOperationsIndicies",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "validators",
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "previousvalidators",
+        "type": "address[]"
+      },
+      {
+        "indexed": false,
+        "name": "howManyValidatorsDecide",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "newvalidators",
+        "type": "address[]"
+      },
+      {
+        "indexed": false,
+        "name": "newHowManyValidatorsDecide",
+        "type": "uint256"
+      }
+    ],
+    "name": "ValidatorShipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "howMany",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "validatorsCount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "proposer",
+        "type": "address"
+      }
+    ],
+    "name": "OperationCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "votes",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "howMany",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "validatorsCount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "upvoter",
+        "type": "address"
+      }
+    ],
+    "name": "OperationUpvoted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "howMany",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "validatorsCount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "performer",
+        "type": "address"
+      }
+    ],
+    "name": "OperationPerformed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "votes",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "validatorsCount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "downvoter",
+        "type": "address"
+      }
+    ],
+    "name": "OperationDownvoted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "lastCanceller",
+        "type": "address"
+      }
+    ],
+    "name": "OperationCancelled",
+    "type": "event"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "wallet",
+        "type": "address"
+      }
+    ],
+    "name": "isExistValidator",
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "validatorsCount",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "allOperationsCount",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "operation",
+        "type": "bytes32"
+      }
+    ],
+    "name": "cancelPending",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [],
+    "name": "cancelAllPending",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "newvalidators",
+        "type": "address[]"
+      }
+    ],
+    "name": "transferValidatorShip",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "newvalidators",
+        "type": "address[]"
+      },
+      {
+        "name": "newhowManyValidatorsDecide",
+        "type": "uint256"
+      }
+    ],
+    "name": "transferValidatorShipWithHowMany",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "wallet",
+        "type": "address"
+      }
+    ],
+    "name": "isExistValidator",
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "newValidators",
+        "type": "address[]"
+      },
+      {
+        "name": "newHowManyValidatorsDecide",
+        "type": "uint256"
+      }
+    ],
+    "name": "transferValidatorShipWithHowMany",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "allOperationsCount",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [],
+    "name": "cancelAllPending",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "validators",
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "howManyValidatorsDecide",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "allOperations",
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "votesMaskByOperation",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "validatorsGeneration",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "operation",
+        "type": "bytes32"
+      }
+    ],
+    "name": "cancelPending",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "votesCountByOperation",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "validatorsIndices",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "newValidators",
+        "type": "address[]"
+      }
+    ],
+    "name": "transferValidatorShip",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "allOperationsIndicies",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "validatorsCount",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_token",
+        "type": "address"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "messageID",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "sender",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "recipient",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "RelayMessage",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "messageID",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "sender",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "RevertMessage",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "MessageID",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "substrateSender",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "WithdrawMessage",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "messageID",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "sender",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "recipient",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "ApprovedRelayMessage",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "previousValidators",
+        "type": "address[]"
+      },
+      {
+        "indexed": false,
+        "name": "howManyValidatorsDecide",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "newvalidators",
+        "type": "address[]"
+      },
+      {
+        "indexed": false,
+        "name": "newHowManyValidatorsDecide",
+        "type": "uint256"
+      }
+    ],
+    "name": "ValidatorShipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "howMany",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "validatorsCount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "proposer",
+        "type": "address"
+      }
+    ],
+    "name": "OperationCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "votes",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "howMany",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "validatorsCount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "upvoter",
+        "type": "address"
+      }
+    ],
+    "name": "OperationUpvoted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "howMany",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "validatorsCount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "performer",
+        "type": "address"
+      }
+    ],
+    "name": "OperationPerformed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "votes",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "validatorsCount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "downvoter",
+        "type": "address"
+      }
+    ],
+    "name": "OperationDownvoted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "lastCanceller",
+        "type": "address"
+      }
+    ],
+    "name": "OperationCancelled",
+    "type": "event"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "name": "substrateAddress",
+        "type": "bytes32"
+      }
+    ],
+    "name": "setTransfer",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "messageID",
+        "type": "bytes32"
+      }
+    ],
+    "name": "revertTransfer",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "messageID",
+        "type": "bytes32"
+      },
+      {
+        "name": "spender",
+        "type": "address"
+      },
+      {
+        "name": "substrateAddress",
+        "type": "bytes32"
+      },
+      {
+        "name": "availableAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "approveTransfer",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "messageID",
+        "type": "bytes32"
+      }
+    ],
+    "name": "confirmTransfer",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "messageID",
+        "type": "bytes32"
+      },
+      {
+        "name": "substrateSender",
+        "type": "bytes32"
+      },
+      {
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "name": "availableAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "withdrawTransfer",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "Transfer",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "spender",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "Approval",
+    "type": "event"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "totalSupply",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "balanceOf",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "transfer",
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "name": "spender",
+        "type": "address"
+      }
+    ],
+    "name": "allowance",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "spender",
+        "type": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "approve",
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "sender",
+        "type": "address"
+      },
+      {
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "transferFrom",
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "last_completed_migration",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "completed",
+        "type": "uint256"
+      }
+    ],
+    "name": "setCompleted",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "new_address",
+        "type": "address"
+      }
+    ],
+    "name": "upgrade",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "validators",
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "howManyValidatorsDecide",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "allOperations",
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "votesMaskByOperation",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "validatorsGeneration",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "votesCountByOperation",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "validatorsIndices",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "allOperationsIndicies",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "previousValidators",
+        "type": "address[]"
+      },
+      {
+        "indexed": false,
+        "name": "howManyValidatorsDecide",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "newvalidators",
+        "type": "address[]"
+      },
+      {
+        "indexed": false,
+        "name": "newHowManyValidatorsDecide",
+        "type": "uint256"
+      }
+    ],
+    "name": "ValidatorShipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "howMany",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "validatorsCount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "proposer",
+        "type": "address"
+      }
+    ],
+    "name": "OperationCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "votes",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "howMany",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "validatorsCount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "upvoter",
+        "type": "address"
+      }
+    ],
+    "name": "OperationUpvoted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "howMany",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "validatorsCount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "performer",
+        "type": "address"
+      }
+    ],
+    "name": "OperationPerformed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "votes",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "validatorsCount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "downvoter",
+        "type": "address"
+      }
+    ],
+    "name": "OperationDownvoted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "name": "operation",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "name": "lastCanceller",
+        "type": "address"
+      }
+    ],
+    "name": "OperationCancelled",
+    "type": "event"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "wallet",
+        "type": "address"
+      }
+    ],
+    "name": "isExistValidator",
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "validatorsCount",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "allOperationsCount",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "operation",
+        "type": "bytes32"
+      }
+    ],
+    "name": "cancelPending",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [],
+    "name": "cancelAllPending",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "newValidators",
+        "type": "address[]"
+      }
+    ],
+    "name": "transferValidatorShip",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "newValidators",
+        "type": "address[]"
+      },
+      {
+        "name": "newHowManyValidatorsDecide",
+        "type": "uint256"
+      }
+    ],
+    "name": "transferValidatorShipWithHowMany",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

@@ -1,0 +1,38 @@
+{
+    "compilerOptions": {
+        "typeRoots": [
+            "./node_modules/@types",
+            "./@types"
+        ],
+        "traceResolution": false,
+        "module": "esnext",
+        "target": "es5",
+        "lib": [
+            "es2015",
+            "es2017",
+            "es6",
+            "es7",
+            "es5",
+            "dom",
+            "scripthost"
+        ],
+        "jsx": "react",
+        "experimentalDecorators": true,
+        "moduleResolution": "node",
+        "baseUrl": "./",
+        "paths": {
+            "~*": ["./src/*"]
+        },
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "esModuleInterop": true,
+        "importHelpers": true,
+        "strict": true,
+        "sourceMap": true,
+        "resolveJsonModule": true
+    },
+    "include": [
+        "src/**/*",
+        "@types/**/*"
+    ]
+}

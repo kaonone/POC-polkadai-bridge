@@ -1,0 +1,23 @@
+[package]
+name = "raw-transaction-builder"
+version = "0.1.0"
+authors = ["Andrei Orlov <aaorlov1@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+base64 = "0.10.1"
+ethsign = {version = "0.6.1", default-features = false, features = ["pure-rust"]}
+ethsign-crypto = "0.1.0"
+ethereum-types = "0.6.0"
+rustc-hex = "2.0.1"
+serde = "1.0.99"
+serde_derive = "1.0.99"
+serde_json = "1.0.40"
+serde_cbor = "0.10.1"
+primitive-types = {version = "0.5.0", default-features = false, features = ["default", "rlp", "serde"]}
+rlp = "0.4.2"
+tiny-bip39 = "0.6.2"
+tiny-hderive = "0.2.1"
+web3 = {version = "0.8.0", default-features = false, features = ["http", "tls"]}
