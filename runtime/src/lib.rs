@@ -60,8 +60,6 @@ pub type BlockNumber = u64;
 pub type Nonce = u64;
 
 pub mod bridge;
-mod dao;
-mod marketplace;
 mod token;
 mod types;
 
@@ -274,14 +272,6 @@ impl contract::Trait for Runtime {
     type GasPayment = ();
 }
 
-impl dao::Trait for Runtime {
-    type Event = Event;
-}
-
-impl marketplace::Trait for Runtime {
-    type Event = Event;
-}
-
 impl token::Trait for Runtime {
     type Event = Event;
 }
@@ -313,8 +303,6 @@ construct_runtime!(
 		Grandpa: grandpa::{Module, Call, Storage, Config<T>, Log(), Event<T>},
 		Treasury: treasury,
 		Contract: contract::{Module, Call, Config<T>, Event<T>},
-		Dao: dao::{Module, Call, Storage, Event<T>},
-		Marketplace: marketplace::{Module, Call, Storage, Event<T>},
         Token: token::{Module, Call, Storage, Event<T>},
         Bridge: bridge::{Module, Call, Storage, Config<T>, Event<T>},
 	}

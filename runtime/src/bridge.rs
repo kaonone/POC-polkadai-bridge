@@ -1,4 +1,4 @@
-/// runtime module implementing Substrate side of AkropolisOS token exchange bridge
+/// runtime module implementing Substrate side of Erc20SubstrateBridge token exchange bridge
 /// You can use mint to create tokens backed by locked funds on Ethereum side
 /// and transfer tokens on substrate side freely
 ///
@@ -264,7 +264,7 @@ impl<T: Trait> Module<T> {
             Status::Withdraw => match message.status {
                 Status::Confirmed => Self::execute_burn(message.message_id),
                 Status::Approved => {
-                    let to = message.eth_address.clone();
+                    let to = message.eth_address;
                     let from = message.substrate_address.clone();
                     Self::lock_for_burn(from.clone(), message.amount)?;
                     Self::deposit_event(RawEvent::ApprovedRelayMessage(
@@ -317,7 +317,7 @@ impl<T: Trait> Module<T> {
         let message = <Messages<T>>::get(message_id);
         let transfer_id = <TransferId<T>>::get(message_id);
         let mut transfer = <BridgeTransfers<T>>::get(transfer_id);
-        if transfer.open == false && message.status == Status::Confirmed {
+        if !transfer.open && message.status == Status::Confirmed {
             transfer.votes = 0;
             transfer.open = true;
             <BridgeTransfers<T>>::insert(transfer_id, transfer);

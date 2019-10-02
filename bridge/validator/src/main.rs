@@ -174,7 +174,7 @@ fn main() {
                         Ok(())
                     }
                     (_, _, true) => {
-                        let result = ethabi::decode(&[ParamType::FixedBytes(32), ParamType::FixedBytes(32), ParamType::Address, ParamType::Uint(256)], &log.data.0);
+                        let result = ethabi::decode(&[ParamType::FixedBytes(32)], &log.data.0);
                         if let Ok(params) = result {
                             log::info!("[ethereum] got decoded log.data: {:?}", params);
                             if params.len() >= 4 {

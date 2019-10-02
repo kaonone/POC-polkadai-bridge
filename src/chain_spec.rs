@@ -1,8 +1,7 @@
 use erc20_substrate_bridge_runtime::{
-    AccountId, BalancesConfig, ConsensusConfig, ContractConfig, CouncilVotingConfig,
+    AccountId, BalancesConfig, BridgeConfig, ConsensusConfig, ContractConfig, CouncilVotingConfig,
     DemocracyConfig, GenesisConfig, GrandpaConfig, IndicesConfig, Perbill, Permill, Schedule,
     SessionConfig, StakerStatus, StakingConfig, SudoConfig, TimestampConfig, TreasuryConfig,
-	BridgeConfig
 };
 use primitives::{crypto::UncheckedInto, ed25519, sr25519, Pair};
 use substrate_service;
@@ -195,7 +194,7 @@ fn testnet_genesis(
 			current_schedule: Schedule::default(), // Current cost schedule for contracts.
 		}),
 		bridge: Some(BridgeConfig {
-			validators_count: 3usize, //default 
+			validators_count: 3usize, //default
 			_genesis_phantom_data: Default::default(), //https://substrate.dev/docs/en/runtime/initializing-storage#calculate-individually-with-build
 		}),
 	}
@@ -207,32 +206,54 @@ fn akropolis_genesis() -> Result<ChainSpec, String> {
 
 fn akropolis_staging_genesis() -> GenesisConfig {
     let endowed_accounts = vec![
-        hex!("ac093ae2c4b5cc62aca5ceca961ed3bd3ad65d0fdcc3cbd206109d5ab970e171").unchecked_into(), // 5FxGqPvuyvKaGvwaHAiTjvVpQMoZcgd1tLbWWWyPH4QNyc6Q
+        hex!("a44d98789c9a618560cdfba9b9100df8f74cf8a477e71f202a841a5bd3b7d040").unchecked_into(), // 5Fn8m67WboHonj6SjHogaUkQnTEyLwkAkimkyDvC5mFriuea
+    ];
+
+    let bidge_validators = vec![
+        hex!("3a495ac93eca02fa4f64bcc99b2f950b7df8d866b4b107596a0ea7a547b48753").unchecked_into(), // 5DP8Rd8jUQD9oukZduPSMxdrH8g3r4mzS1zXLZCS6qDissTm
+        hex!("1450cad95384831a1b267f2d18273b83b77aaee8555a23b7f1abbb48b5af8e77").unchecked_into(), // 5CXLpEbkeqp475Y8p7uMeiimgKXX6haZ1fCT4jzyry26CPxp
+        hex!("2452305cbdb33a55de1bc46f6897fd96d724d8bccc5ca4783f6f654af8582d58").unchecked_into(), // 5CtKzjXcWrD8GRQqorFiwHF9oUbx2wHpf43erxB2u7dpfCq9
     ];
 
     let initial_authorities = vec![
         // (stash, controller, session)
         (
-            hex!("927b39cac18dabc394d7c744fad4467d51310bf299330f9810427f8508d6ee09")
-                .unchecked_into(), // 5FNmTHadRw12fPwkrSdoKNznX5HpTcvcwvmKu5PF1suGiwP8
-            hex!("6cd3b2029a60d1e8a415de9aeed40b76ed3815678f75557b12db2b57559f8d43")
-                .unchecked_into(), // 5EXPv3Y6obajCD9PTCa4u6ZdZgQ2wowFh8yZA7DiKibirpDW
-            hex!("c763486fcc0753cfde644da6d193d092d10015384cb5ef6cca7597bbb9a900b3")
-                .unchecked_into(), // 5Ga8sxc52JGnb31zhizJpS9ixVzMneDjse8XLNAi4Gvp2mhB
+            hex!("2c5d2a346ed26c77f8f751c231e88115a9894557bf9ef188b051c2be6ae8593e")
+                .unchecked_into(), // 5D4se4ee1pnN4vzuRQf4i8w6mLcYACgnxvwCPqJU7wTxCFDF
+            hex!("060d81df438bd61b7c58aa180c376199a929065cda5b8999bdad7600d61ee23f")
+                .unchecked_into(), // 5CCeA4L5puxt5UiM9g6f5mrLHc6LHA4vWCaAxsU6p5mvXoUX
+            hex!("c09c516fe5f616b7a8a17bbd52372ba66615a969a83e27321591ca0a335faf1b")
+                .unchecked_into(), // 5GRFVDCnrXbqJZ1xpEKiu3KigLVsfQiudNieGfKafK1q63XJ
         ),
         (
-            hex!("10fffd9162e7950a449eff6024ac326321228df2659c2a1f9d5c084c56fcc112")
-                .unchecked_into(), // 5CSzfigG2EGM3MmCcjKSAJMdtgbh4eNKc54kVU9BJBPVxju3
-            hex!("4e18e46d6e8c086a81a9162fa72d95bb3a0712f0ab73ea872cc88b810bdd2575")
-                .unchecked_into(), // 5Dq6zBbF78utVLB16oAc3b7bCJKRksuoomoWeBF7LsbKVcjx
-            hex!("a17221f222c706dea7adfb7e6ec3dbba9a7febc8eed6ff3aa5428db31a16c875")
-                .unchecked_into(), // 5FiPUGuYULQhcxkdUhAakHprBFQWj37ac5YwaSo5Kph9Vypz
+            hex!("d84358df95f03cfa0392a99d9d4f774e28e36f53922ef574af7a54a4201ae60a")
+                .unchecked_into(), // 5GxGCw4ZtrFyKJwEXSe2P6pzL4mmbQAfWzjnqNUGJWGANVU6
+            hex!("5a70788f479ef92863cdfba2aa63f4e18fd2609fe6c922d33b8d5416a173af22")
+                .unchecked_into(), // 5E7HaTQL2f9V6RoyRnZcJq1YdscnT6GQWM92KDbUNQtbMq8K
+            hex!("648d7d9895dc548daf42496d791f7b636047548538cbe3aaf64538bf18335006")
+                .unchecked_into(), // 5ELYgE69fvCDsKRaH2zELPHNqMGHDPdaTx7XfeVM9iTLmc3F
+        ),
+        (
+            hex!("de97817f71aa70f005a692e49a7bf59ce1e4591f5f6a174c3a72f28440e23f01")
+                .unchecked_into(), // 5H6ZVckfsC2MmCEMiNSgANb59hG1A1YZ4R4htpSVQRaa5g9C
+            hex!("eafbee6e929feb39c392798c1eb8ffad9db77b402b4d9c41329ca6eb7295883f")
+                .unchecked_into(), // 5HNouEfpMzyBDpbnb5y3TmpCVUBiEBZY5ohmG2G2LdTNFVE2
+            hex!("506df52cd7366c5755f0dea6cc77e214dd1c5f89d6df03d300792931898d4074")
+                .unchecked_into(), // 5DtAMP4KBredD7Jb7wxdqBwPpmyppBeXhprNsxKmbhX16Cw8
         ),
     ];
 
     const DEV: u128 = 1_000_000_000_000_000;
     const ENDOWMENT: u128 = 4_000_000 * DEV;
     const STASH: u128 = 10 * DEV;
+
+    let balances = endowed_accounts
+        .iter()
+        .cloned()
+        .map(|x| (x, ENDOWMENT))
+        .chain(initial_authorities.iter().cloned().map(|x| (x.0, STASH)))
+        .chain(bidge_validators.iter().cloned().map(|x| (x, STASH)))
+        .collect();
 
     GenesisConfig {
 		consensus: Some(ConsensusConfig {
@@ -252,7 +273,7 @@ fn akropolis_staging_genesis() -> GenesisConfig {
 			existential_deposit: 500,
 			transfer_fee: 0,
 			creation_fee: 0,
-			balances: endowed_accounts.iter().cloned().map(|x| (x, ENDOWMENT)).chain(initial_authorities.iter().cloned().map(|x| (x.0, STASH))).collect(),
+			balances,
 			vesting: vec![],
 		}),
 		sudo: Some(SudoConfig {
@@ -311,7 +332,7 @@ fn akropolis_staging_genesis() -> GenesisConfig {
 			current_schedule: Schedule::default(), // Current cost schedule for contracts.
 		}),
 		bridge: Some(BridgeConfig {
-			validators_count: 3usize, //default 
+			validators_count: 3usize, //default
 			_genesis_phantom_data: Default::default(), //https://substrate.dev/docs/en/runtime/initializing-storage#calculate-individually-with-build
 		})
 	}

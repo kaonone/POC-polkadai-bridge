@@ -89,5 +89,5 @@ vergen = '3'
 panic = 'unwind'
 
 [[bin]]
-name = 'akropolisos-substrate-node'
+name = 'erc20-substrate-bridge'
 path = 'src/main.rs'
