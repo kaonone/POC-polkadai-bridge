@@ -200,7 +200,7 @@ fn testnet_genesis(
 		}),
 		bridge: Some(BridgeConfig {
 			validators_count: 3usize, //default
-			validator_accounts: bridge_validators,			
+			validator_accounts: bridge_validators,
 		}),
 	}
 }
@@ -272,7 +272,7 @@ fn akropolis_staging_genesis() -> GenesisConfig {
 		indices: Some(IndicesConfig {
 			ids: endowed_accounts.iter().cloned().chain(initial_authorities.iter().cloned().map(|x| x.0)).collect(),
 		}),
-		balances: Some(BalancesConfig { 
+		balances: Some(BalancesConfig {
 			transaction_base_fee: 1,
 			transaction_byte_fee: 0,
 			existential_deposit: 500,
