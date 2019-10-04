@@ -4,8 +4,63 @@ use primitives::{H160, H256};
 use rustc_hex::ToHex;
 use substrate_api_client::{hexstr_to_u256, Api};
 
+use node_runtime;
 use primitives::{blake2_256, crypto::Pair, hexdisplay::HexDisplay, sr25519};
 use runtime_primitives::generic::Era;
+
+use std::sync::Arc;
+
+pub fn mint(
+    sub_api: Arc<Api>,
+    signer_mnemonic_phrase: String,
+    message_id: primitives::H256,
+    from: primitives::H160,
+    to: AccountId,
+    amount: u64,
+) {
+    let xthex = build_mint(
+        &sub_api,
+        get_sr25519_pair(&signer_mnemonic_phrase),
+        message_id,
+        from,
+        to,
+        amount,
+    );
+    //send and watch extrinsic until finalized
+    let _tx_hash = sub_api.send_extrinsic(xthex);
+}
+
+pub fn approve_transfer(
+    sub_api: &Api,
+    signer_mnemonic_phrase: String,
+    message_id: primitives::H256,
+) {
+    let xthex = build_approve_transfer(
+        &sub_api,
+        get_sr25519_pair(&signer_mnemonic_phrase),
+        message_id,
+    );
+    //send and watch extrinsic until finalized
+    let _tx_hash = sub_api.send_extrinsic(xthex);
+}
+
+pub fn confirm_transfer(
+    sub_api: &Api,
+    signer_mnemonic_phrase: String,
+    message_id: primitives::H256,
+) {
+    let xthex = build_confirm_transfer(
+        &sub_api,
+        get_sr25519_pair(&signer_mnemonic_phrase),
+        message_id,
+    );
+    //send and watch extrinsic until finalized
+    let _tx_hash = sub_api.send_extrinsic(xthex);
+}
+
+fn get_sr25519_pair(signer_mnemonic_phrase: &str) -> sr25519::Pair {
+    sr25519::Pair::from_phrase(signer_mnemonic_phrase, None).expect("invalid menemonic phrase")
+}
 
 pub fn build_mint(
     sub_api: &Api,
@@ -22,14 +77,7 @@ pub fn build_mint(
 
     log::debug!("using genesis hash: {:?}", genesis_hash);
     let raw_payload = (Compact(signer_index), function, era, genesis_hash);
-    let signature = raw_payload.using_encoded(|payload| {
-        if payload.len() > 256 {
-            signer.sign(&blake2_256(payload)[..])
-        } else {
-            log::debug!("signing {}", HexDisplay::from(&payload));
-            signer.sign(payload)
-        }
-    });
+    let signature = sign_raw_payload(&raw_payload, &signer);
     let ext = UncheckedExtrinsic::new_signed(
         signer_index,
         raw_payload.1,
@@ -53,14 +101,7 @@ pub fn build_approve_transfer(sub_api: &Api, signer: sr25519::Pair, message_id: 
 
     log::debug!("using genesis hash: {:?}", genesis_hash);
     let raw_payload = (Compact(signer_index), function, era, genesis_hash);
-    let signature = raw_payload.using_encoded(|payload| {
-        if payload.len() > 256 {
-            signer.sign(&blake2_256(payload)[..])
-        } else {
-            log::debug!("signing {}", HexDisplay::from(&payload));
-            signer.sign(payload)
-        }
-    });
+    let signature = sign_raw_payload(&raw_payload, &signer);
     let ext = UncheckedExtrinsic::new_signed(
         signer_index,
         raw_payload.1,
@@ -84,14 +125,7 @@ pub fn build_confirm_transfer(sub_api: &Api, signer: sr25519::Pair, message_id: 
 
     log::debug!("using genesis hash: {:?}", genesis_hash);
     let raw_payload = (Compact(signer_index), function, era, genesis_hash);
-    let signature = raw_payload.using_encoded(|payload| {
-        if payload.len() > 256 {
-            signer.sign(&blake2_256(payload)[..])
-        } else {
-            log::debug!("signing {}", HexDisplay::from(&payload));
-            signer.sign(payload)
-        }
-    });
+    let signature = sign_raw_payload(&raw_payload, &signer);
     let ext = UncheckedExtrinsic::new_signed(
         signer_index,
         raw_payload.1,
@@ -114,4 +148,17 @@ fn signer_index(sub_api: &Api, signer: &sr25519::Pair) -> u64 {
         .expect("can not read account nonce");
     let nonce = hexstr_to_u256(result_str);
     nonce.low_u64()
+}
+
+type RawPayload = (Compact<u64>, node_runtime::Call, Era, H256);
+
+fn sign_raw_payload(raw_payload: &RawPayload, signer: &sr25519::Pair) -> sr25519::Signature {
+    raw_payload.using_encoded(|payload| {
+        if payload.len() > 256 {
+            signer.sign(&blake2_256(payload)[..])
+        } else {
+            log::debug!("signing {}", HexDisplay::from(&payload));
+            signer.sign(payload)
+        }
+    })
 }
