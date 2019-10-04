@@ -1,5 +1,5 @@
-# erc20-substrate-bridge
-A SRML-based Substrate node, ready for hacking.
+# DAI Ethereum  <-> Parity Substrate Bridge
+ Ethereum <-> Parity Substrate Blockchain bridge for self transfers of DAI Token (ERC20) to sDAI (ERC20 representation).
 
 ## You can try it out in our chain:
 1. Make sure you have ethereum and substrate extensions. Typical choises would be:
