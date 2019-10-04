@@ -117,6 +117,11 @@ fn testnet_genesis(
     endowed_accounts: Vec<AccountId>,
     root_key: AccountId,
 ) -> GenesisConfig {
+	let bridge_validators = vec![
+        hex!("3a495ac93eca02fa4f64bcc99b2f950b7df8d866b4b107596a0ea7a547b48753").unchecked_into(), // 5DP8Rd8jUQD9oukZduPSMxdrH8g3r4mzS1zXLZCS6qDissTm
+        hex!("1450cad95384831a1b267f2d18273b83b77aaee8555a23b7f1abbb48b5af8e77").unchecked_into(), // 5CXLpEbkeqp475Y8p7uMeiimgKXX6haZ1fCT4jzyry26CPxp
+        hex!("2452305cbdb33a55de1bc46f6897fd96d724d8bccc5ca4783f6f654af8582d58").unchecked_into(), // 5CtKzjXcWrD8GRQqorFiwHF9oUbx2wHpf43erxB2u7dpfCq9
+    ];
     GenesisConfig {
 		consensus: Some(ConsensusConfig {
 			code: include_bytes!("../runtime/wasm/target/wasm32-unknown-unknown/release/erc20_substrate_bridge_runtime_wasm.compact.wasm").to_vec(),
@@ -195,7 +200,7 @@ fn testnet_genesis(
 		}),
 		bridge: Some(BridgeConfig {
 			validators_count: 3usize, //default
-			_genesis_phantom_data: Default::default(), //https://substrate.dev/docs/en/runtime/initializing-storage#calculate-individually-with-build
+			validator_accounts: bridge_validators,			
 		}),
 	}
 }
@@ -209,7 +214,7 @@ fn akropolis_staging_genesis() -> GenesisConfig {
         hex!("a44d98789c9a618560cdfba9b9100df8f74cf8a477e71f202a841a5bd3b7d040").unchecked_into(), // 5Fn8m67WboHonj6SjHogaUkQnTEyLwkAkimkyDvC5mFriuea
     ];
 
-    let bidge_validators = vec![
+    let bridge_validators = vec![
         hex!("3a495ac93eca02fa4f64bcc99b2f950b7df8d866b4b107596a0ea7a547b48753").unchecked_into(), // 5DP8Rd8jUQD9oukZduPSMxdrH8g3r4mzS1zXLZCS6qDissTm
         hex!("1450cad95384831a1b267f2d18273b83b77aaee8555a23b7f1abbb48b5af8e77").unchecked_into(), // 5CXLpEbkeqp475Y8p7uMeiimgKXX6haZ1fCT4jzyry26CPxp
         hex!("2452305cbdb33a55de1bc46f6897fd96d724d8bccc5ca4783f6f654af8582d58").unchecked_into(), // 5CtKzjXcWrD8GRQqorFiwHF9oUbx2wHpf43erxB2u7dpfCq9
@@ -252,7 +257,7 @@ fn akropolis_staging_genesis() -> GenesisConfig {
         .cloned()
         .map(|x| (x, ENDOWMENT))
         .chain(initial_authorities.iter().cloned().map(|x| (x.0, STASH)))
-        .chain(bidge_validators.iter().cloned().map(|x| (x, STASH)))
+        .chain(bridge_validators.iter().cloned().map(|x| (x, STASH)))
         .collect();
 
     GenesisConfig {
@@ -267,7 +272,7 @@ fn akropolis_staging_genesis() -> GenesisConfig {
 		indices: Some(IndicesConfig {
 			ids: endowed_accounts.iter().cloned().chain(initial_authorities.iter().cloned().map(|x| x.0)).collect(),
 		}),
-		balances: Some(BalancesConfig {
+		balances: Some(BalancesConfig { 
 			transaction_base_fee: 1,
 			transaction_byte_fee: 0,
 			existential_deposit: 500,
@@ -333,7 +338,7 @@ fn akropolis_staging_genesis() -> GenesisConfig {
 		}),
 		bridge: Some(BridgeConfig {
 			validators_count: 3usize, //default
-			_genesis_phantom_data: Default::default(), //https://substrate.dev/docs/en/runtime/initializing-storage#calculate-individually-with-build
+			validator_accounts: bridge_validators,
 		})
 	}
 }

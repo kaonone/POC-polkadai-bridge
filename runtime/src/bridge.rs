@@ -4,6 +4,7 @@
 ///
 use crate::token;
 use crate::types::{MemberId, ProposalId, TokenBalance};
+use rstd::vec::Vec;
 use parity_codec::{Decode, Encode};
 use primitives::H160;
 use runtime_primitives::traits::{As, Hash};
@@ -99,7 +100,7 @@ decl_storage! {
         MessageId get(message_id_by_transfer_id): map(ProposalId) => T::Hash;
 
         ValidatorsCount get(validators_count) config(): usize = 3;
-        ValidatorsAccounts get(validators_accounts): map MemberId => T::AccountId;
+        ValidatorAccounts get(validator_accounts) config(): Vec<T::AccountId>;
     }
 }
 
@@ -132,7 +133,10 @@ decl_module! {
 
         // ethereum-side multi-signed mint operation
         fn multi_signed_mint(origin, message_id: T::Hash, from: H160, to: T::AccountId, #[compact] amount: TokenBalance)-> Result {
-            ensure_signed(origin)?;
+            let validator = ensure_signed(origin)?;
+
+            let is_trusted = <ValidatorAccounts<T>>::get().iter().any(|a| *a == validator);
+            ensure!(is_trusted, "only validators can call this function");
 
             if !<Messages<T>>::exists(message_id) {
                 let message = Message{
@@ -416,6 +420,16 @@ mod tests {
                 existential_deposit: 500,
                 transfer_fee: 0,
                 creation_fee: 0,
+            }
+            .build_storage()
+            .unwrap()
+            .0,
+        );
+
+        r.extend(
+            GenesisConfig::<Test> {
+                validators_count: 3usize,
+                validator_accounts: vec![V1, V2, V3]
             }
             .build_storage()
             .unwrap()

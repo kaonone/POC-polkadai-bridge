@@ -51,29 +51,6 @@ decl_module! {
     pub struct Module<T: Trait> for enum Call where origin: T::Origin {
         fn deposit_event<T>() = default;
 
-        // Burn tokens
-        fn burn(origin, from: T::AccountId, #[compact] amount: TokenBalance) -> Result {
-            ensure_signed(origin)?;
-
-            // (!) : can be called directly
-            // do we even need this?
-            Self::_burn(from.clone(), amount)?;
-            Self::deposit_event(RawEvent::Burn(from, amount));
-
-            Ok(())
-        }
-
-        fn mint(origin, to: T::AccountId, #[compact] amount: TokenBalance) -> Result{
-            ensure_signed(origin)?;
-
-            // (!) : can be called directly
-            // do we even need this ?
-            Self::_mint(to.clone(), amount)?;
-            Self::deposit_event(RawEvent::Mint(to, amount));
-
-            Ok(())
-        }
-
         fn transfer(origin,
             to: <T::Lookup as StaticLookup>::Source,
             #[compact] amount: TokenBalance
@@ -282,7 +259,7 @@ mod tests {
     #[test]
     fn mint_new_token_works() {
         with_externalities(&mut new_test_ext(), || {
-            assert_ok!(TokenModule::mint(Origin::signed(USER1), USER2, 1000));
+            assert_ok!(TokenModule::_mint(USER2, 1000));
 
             assert_eq!(TokenModule::balance_of(USER2), 1000);
             assert_eq!(TokenModule::total_supply(), 1000);
@@ -292,7 +269,7 @@ mod tests {
     #[test]
     fn token_transfer_works() {
         with_externalities(&mut new_test_ext(), || {
-            assert_ok!(TokenModule::mint(Origin::signed(USER1), USER2, 1000));
+            assert_ok!(TokenModule::_mint( USER2, 1000));
 
             assert_eq!(TokenModule::balance_of(USER2), 1000);
             assert_ok!(TokenModule::transfer(Origin::signed(USER2), USER1, 300));
@@ -304,7 +281,7 @@ mod tests {
     #[test]
     fn token_transfer_not_enough() {
         with_externalities(&mut new_test_ext(), || {
-            assert_ok!(TokenModule::mint(Origin::signed(USER1), USER2, 1000));
+            assert_ok!(TokenModule::_mint(USER2, 1000));
 
             assert_eq!(TokenModule::balance_of(USER2), 1000);
             assert_ok!(TokenModule::transfer(Origin::signed(USER2), USER1, 300));
@@ -320,20 +297,20 @@ mod tests {
     #[test]
     fn token_transfer_burn_works() {
         with_externalities(&mut new_test_ext(), || {
-            assert_ok!(TokenModule::mint(Origin::signed(USER1), USER2, 1000));
+            assert_ok!(TokenModule::_mint(USER2, 1000));
             assert_eq!(TokenModule::balance_of(USER2), 1000);
 
-            assert_ok!(TokenModule::burn(Origin::signed(USER1), USER2, 300));
+            assert_ok!(TokenModule::_burn(USER2, 300));
             assert_eq!(TokenModule::balance_of(USER2), 700);
         })
     }
     #[test]
     fn token_transfer_burn_all_works() {
         with_externalities(&mut new_test_ext(), || {
-            assert_ok!(TokenModule::mint(Origin::signed(USER1), USER2, 1000));
+            assert_ok!(TokenModule::_mint(USER2, 1000));
             assert_eq!(TokenModule::balance_of(USER2), 1000);
 
-            assert_ok!(TokenModule::burn(Origin::signed(USER1), USER2, 1000));
+            assert_ok!(TokenModule::_burn(USER2, 1000));
             assert_eq!(TokenModule::balance_of(USER2), 0);
         })
     }
