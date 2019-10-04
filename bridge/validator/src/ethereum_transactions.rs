@@ -1,8 +1,24 @@
 use raw_transaction_builder::{Bip32ECKeyPair, RawTransaction};
 use rustc_hex::FromHex;
-use web3::{self, types::U256};
+use web3::{self, contract::tokens::Tokenize, types::U256};
 
 const CHAIN_ID: u8 = 42;
+
+pub fn build_transaction_data<P>(abi: &ethabi::Contract, function_name: &str, params: P) -> Vec<u8>
+where
+    P: Tokenize,
+{
+    abi.function(function_name)
+        .and_then(|function| function.encode_input(&params.into_tokens()))
+        .unwrap_or_else(|error| {
+            log::warn!(
+                "can not build transaction data for {:?}: {:?}",
+                function_name,
+                error
+            );
+            vec![]
+        })
+}
 
 pub fn build(
     private_key: String,
