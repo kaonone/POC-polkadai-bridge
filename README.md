@@ -1,42 +1,76 @@
 # erc20-substrate-bridge
+A SRML-based Substrate node, ready for hacking.
 
-A new SRML-based Substrate node, ready for hacking.
+## You can try it out in our chain:
+1. Make sure you have ethereum and substrate extensions. Typical choises would be:
+  <br>a. `Metamask` (or any other Ethereum extension) and switch it to `Kovan`
+  <br>b. `polkadot{.js}`
+2. Go [here](https://polkadai-bridge.akropolis.io/)
+3. Connect with both extensions(two pop-up window should appear)
+4. You will see that your balances from extensions should appear in the page.
+5. Transfer some Kovan test DAI to our substrate-based chain.
+6. Transfer some DAI from our chain to your Ethereum account.
 
-# Building
+Should be pretty obvious from this point.
+If you hit some problems, please feel free to file an issue!
 
-Install Rust:
+<pre>
+├── bridge
+│   ├── dai-home
+│   ├── frontend
+│   └── validator - Validator service to connect Substrate to Ethereum.
+├── runtime
+├── scripts
+├── src
+</pre>
+
+## Building
+
+### 1. Install Rust:
 
 ```bash
 curl https://sh.rustup.rs -sSf | sh
 ```
 
-Install required tools:
+### 2. Install required tools:
 
 ```bash
 ./scripts/init.sh
 ```
 
-Build the WebAssembly binary:
+### 3. Build the WebAssembly binary:
 
 ```bash
 ./scripts/build.sh
 ```
 
-Build all native code:
+### 4. Build all native code:
 
 ```bash
 cargo build
 ```
 
-# Run
+### 5. Build validator node
 
-You can start a full node:
+Follow the [validator README](https://github.com/akropolisio/erc20-substrate-bridge/blob/master/bridge/validator/README.md) instructions.
+
+### 6. Build frontend
+
+Follow the [frontend README](https://github.com/akropolisio/erc20-substrate-bridge/blob/master/bridge/frontend/README.md) instructions.
+
+### 4.(Optional) Tweak configuration to use your own keys and account.
+
+## Run
+
+### Start a full node:
 
 ```bash
 cargo run -- --name node-name
 ```
 
-# Development
+
+
+### Development
 
 You can start a development chain with:
 
@@ -76,54 +110,27 @@ cargo run -- \
 Additional CLI usage options are available and may be shown by running `cargo run -- --help`.
 
 
-# How it works
+## How it works
 
-## Account creation
-
+## Make bridge on your own chain
+In case you want to test it in a customise-all-the-things fashion, buckle up for some extra-work!
 
 This guide will walk you through how to create account and how to connect to AkropolisOSChain Testnet.
+1) Run the node (previous steps, Build -> Run)
 
-1) Open [Akropolis UI](https://wallet.akropolis.io) (it’s polkadotJS app working with substrate v.1.0). You can also use [Polkadot UI](https://polkadot.js.org/apps/#/explorer).
+2) Open [Akropolis UI](https://wallet.akropolis.io) (it’s polkadotJS app working with substrate v.1.0). You can also use [Polkadot UI](https://polkadot.js.org/apps/#/explorer).
 
-2) Go to *Settings*, open *Developer* tab. Insert in textbox description of types (copy&paste from here) and Save it.
+3) Go to *Settings*, open *Developer* tab. Insert in textbox description of types (copy&paste from here) and Save it.
 
 
 ```bash
 
 {
   "Count": "u64",
-  "DaoId": "u64",
   "MemberId": "u64",
   "ProposalId": "u64",
   "TokenBalance": "u64",
-  "VotesCount": "MemberId",
   "TokenId": "u32",
-  "Days": "u32",
-  "Rate": "u32",
-  "Dao": {
-    "address": "AccountId",
-    "name": "Text",
-    "description": "Bytes",
-    "founder": "AccountId"
-  },
-  "Action": {
-    "_enum": {
-      "EmptyAction": null,
-      "AddMember": "AccountId",
-      "RemoveMember": "AccountId",
-      "GetLoan": "(Vec<u8>, Days, Rate, Balance)",
-      "Withdraw": "(AccountId, Balance, Vec<u8>)"
-    }
-  },
-  "Proposal": {
-    "dao_id": "DaoId",
-    "action": "Action",
-    "open": "bool",
-    "accepted": "bool",
-    "voting_deadline": "BlockNumber",
-    "yes_count": "VotesCount",
-    "no_count": "VotesCount"
-  },
   "Token": {
     "token_id": "u32",
     "decimals": "u16",
@@ -155,6 +162,19 @@ This guide will walk you through how to create account and how to connect to Akr
   }
 }
 
-
-
 ```
+
+4) Create an account for each validator you want to launch. 
+Go to *Accounts* and generate new account(and modify validators mnemonic phrase in [ .env file](https://github.com/akropolisio/erc20-substrate-bridge/blob/master/bridge/validator/.env.example)) for each validator.
+
+5) Repeat step 4 for each validator in case you have more than one.
+
+6) Modify validators in [chain_spec.rs](https://github.com/akropolisio/erc20-substrate-bridge/blob/master/src/chain_spec.rs) in GenesisConfig -> bridge
+
+7) Repeat Build + Run instructions 
+
+8) Launch bridge/frontend(you also might need to tweak the keys and endpoints there)
+
+9) Enjoy your local ERC20 Substrate <--> Ethereum bridge in [your browser](http://localhost:1234/)
+
+
