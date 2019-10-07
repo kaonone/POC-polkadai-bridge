@@ -16,7 +16,7 @@ If you hit some problems, please feel free to file an issue!
 
 <pre>
 ├── bridge
-│   ├── dai-home
+│   ├── ethereum
 │   ├── frontend
 │   └── validator - Validator service to connect Substrate to Ethereum.
 ├── runtime
