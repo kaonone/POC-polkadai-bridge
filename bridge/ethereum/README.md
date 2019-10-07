@@ -1,4 +1,4 @@
-#DAI Ethereum Bridge
+# DAI Ethereum Bridge
 <pre>
 1. Install truffle globally with <b>npm install -g truffle</b>
 2. Install ganache-cli globally with <b>npm install -g ganache-cli</b>
