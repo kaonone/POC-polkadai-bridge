@@ -2,13 +2,13 @@
  Ethereum <-> Parity Substrate Blockchain bridge for self transfers of DAI Token (ERC20) to sDAI (ERC20 representation).
 
 ## You can try it out in our chain:
-1. Make sure you have ethereum and substrate extensions. Typical choises would be:
+1. Make sure you have ethereum and Substrate extensions. Typical choises would be:
   <br>a. `Metamask` (or any other Ethereum extension) and switch it to `Kovan`
   <br>b. `polkadot{.js}`
 2. Go [here](https://polkadai-bridge.akropolis.io/)
 3. Connect with both extensions(two pop-up window should appear)
 4. You will see that your balances from extensions should appear in the page.
-5. Transfer some Kovan test DAI to our substrate-based chain.
+5. Transfer some Kovan test DAI to our Substrate-based chain.
 6. Transfer some DAI from our chain to your Ethereum account.
 
 Should be pretty obvious from this point.
@@ -82,7 +82,7 @@ Detailed logs may be shown by running the node with the following environment va
 
 If you want to see the multi-node consensus algorithm in action locally, then you can create a local testnet with two validator nodes for Alice and Bob, who are the initial authorities of the genesis chain that have been endowed with testnet units. Give each node a name and expose them so they are listed on the Polkadot [telemetry site](https://telemetry.polkadot.io/#/Local%20Testnet). You'll need two terminal windows open.
 
-We'll start Alice's substrate node first on default TCP port 30333 with her chain database stored locally at `/tmp/alice`. The bootnode ID of her node is `QmQZ8TjTqeDj3ciwr93EJ95hxfDsb9pEYDizUAbWpigtQN`, which is generated from the `--node-key` value that we specify below:
+We'll start Alice's Substrate node first on default TCP port 30333 with her chain database stored locally at `/tmp/alice`. The bootnode ID of her node is `QmQZ8TjTqeDj3ciwr93EJ95hxfDsb9pEYDizUAbWpigtQN`, which is generated from the `--node-key` value that we specify below:
 
 ```bash
 cargo run -- \
@@ -94,7 +94,7 @@ cargo run -- \
   --validator
 ```
 
-In the second terminal, we'll start Bob's substrate node on a different TCP port of 30334, and with his chain database stored locally at `/tmp/bob`. We'll specify a value for the `--bootnodes` option that will connect his node to Alice's bootnode ID on TCP port 30333:
+In the second terminal, we'll start Bob's Substrate node on a different TCP port of 30334, and with his chain database stored locally at `/tmp/bob`. We'll specify a value for the `--bootnodes` option that will connect his node to Alice's bootnode ID on TCP port 30333:
 
 ```bash
 cargo run -- \
@@ -118,7 +118,7 @@ In case you want to test it in a customise-all-the-things fashion, buckle up for
 This guide will walk you through how to create account and how to connect to AkropolisOSChain Testnet.
 1) Run the node (previous steps, Build -> Run)
 
-2) Open [Akropolis UI](https://wallet.akropolis.io) (it’s polkadotJS app working with substrate v.1.0). You can also use [Polkadot UI](https://polkadot.js.org/apps/#/explorer).
+2) Open [Akropolis UI](https://wallet.akropolis.io) (it’s polkadotJS app working with Substrate v.1.0). You can also use [Polkadot UI](https://polkadot.js.org/apps/#/explorer).
 
 3) Go to *Settings*, open *Developer* tab. Insert in textbox description of types (copy&paste from here) and Save it.
 
