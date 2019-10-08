@@ -2,16 +2,16 @@
  Ethereum <-> Parity Substrate Blockchain bridge for self transfers of DAI Token (ERC20) to sDAI (ERC20 representation).
 
 ## You can try it out in our chain:
-1. Make sure you have ethereum and Substrate extensions. Typical choises would be:
+1. Make sure you have Ethereum and Substrate extensions. Typical choices would be:
   <br>a. `Metamask` (or any other Ethereum extension) and switch it to `Kovan`
   <br>b. `polkadot{.js}`
 2. Go [here](https://polkadai-bridge.akropolis.io/)
-3. Connect with both extensions(two pop-up window should appear)
-4. You will see that your balances from extensions should appear in the page.
+3. Connect with both extensions(two pop-up windows should appear)
+4. You will see that your balances from extensions should appear on the page.
 5. Transfer some Kovan test DAI to our Substrate-based chain.
 6. Transfer some DAI from our chain to your Ethereum account.
 
-Should be pretty obvious from this point.
+It should be pretty obvious from this point.
 If you hit some problems, please feel free to file an issue!
 
 <pre>
@@ -50,7 +50,7 @@ curl https://sh.rustup.rs -sSf | sh
 cargo build
 ```
 
-### 5. Build validator node
+### 5. Build the validator node
 
 Follow the [validator README](https://github.com/akropolisio/erc20-substrate-bridge/blob/master/bridge/validator/README.md) instructions.
 
@@ -58,7 +58,7 @@ Follow the [validator README](https://github.com/akropolisio/erc20-substrate-bri
 
 Follow the [frontend README](https://github.com/akropolisio/erc20-substrate-bridge/blob/master/bridge/frontend/README.md) instructions.
 
-### 4.(Optional) Tweak configuration to use your own keys and account.
+### 4.(Optional) Tweak configuration to use your keys and account.
 
 ## Run
 
@@ -112,10 +112,10 @@ Additional CLI usage options are available and may be shown by running `cargo ru
 
 ## How it works
 
-## Make bridge on your own chain
-In case you want to test it in a customise-all-the-things fashion, buckle up for some extra-work!
+## Make bridge on your chain
+In case you want to test it in a customise-all-the-things fashion, buckle up for some extra work!
 
-This guide will walk you through how to create account and how to connect to AkropolisOSChain Testnet.
+This guide will walk you through how to create an account and how to connect to AkropolisOSChain Testnet.
 1) Run the node (previous steps, Build -> Run)
 
 2) Open [Akropolis UI](https://wallet.akropolis.io) (it’s polkadotJS app working with Substrate v.1.0). You can also use [Polkadot UI](https://polkadot.js.org/apps/#/explorer).
