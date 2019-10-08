@@ -12,7 +12,7 @@
 6. Transfer some DAI from our chain to your Ethereum account.
 
 It should be pretty obvious from this point.
-If you hit some problems, please feel free to file an issue!
+If you hit any problems, please feel free to file an issue!
 
 <pre>
 ├── bridge
