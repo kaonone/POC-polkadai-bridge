@@ -207,6 +207,7 @@ decl_module! {
             let validator = ensure_signed(origin)?;
             Self::check_validator(validator)?;
 
+            ensure!(<ValidatorsCount<T>>::get() < 100_000, "Validators maximum reached.");
             let hash = ("add", &address).using_encoded(<T as system::Trait>::Hashing::hash);
 
             if !<ValidatorHistory<T>>::exists(hash) {
@@ -227,6 +228,8 @@ decl_module! {
         fn remove_validator(origin, address: T::AccountId) -> Result {
             let validator = ensure_signed(origin)?;
             Self::check_validator(validator)?;
+
+            ensure!(<ValidatorsCount<T>>::get() > 1, "Can not remove last validator.");
 
             let hash = ("remove", &address).using_encoded(<T as system::Trait>::Hashing::hash);
 
@@ -335,8 +338,6 @@ impl<T: Trait> Module<T> {
     /// remove validator
     fn _remove_validator(info: ValidatorMessage<T::AccountId, T::Hash>) -> Result {
         let mut validators = <ValidatorAccounts<T>>::get();
-        ensure!(validators.len() > 1, "Cant remove last validator");
-        
         validators.retain(|x| *x != info.account);
         <ValidatorAccounts<T>>::put(validators);
         <ValidatorsCount<T>>::mutate(|x| *x -= 1);
@@ -378,7 +379,7 @@ impl<T: Trait> Module<T> {
                     Self::deposit_event(RawEvent::Minted(message.message_id));
                     Self::update_status(message.message_id, Status::Confirmed, Kind::Transfer)
                 }
-                _ => Err("tried to deposit with non-supported status"),
+                _ => Err("Tried to deposit with non-supported status"),
             },
             Status::Withdraw => match message.status {
                 Status::Confirmed => Self::execute_burn(message.message_id),
@@ -394,9 +395,9 @@ impl<T: Trait> Module<T> {
                     ));
                     Self::update_status(message.message_id, Status::Approved, Kind::Transfer)
                 }
-                _ => Err("tried to withdraw with non-supported status"),
+                _ => Err("Tried to withdraw with non-supported status"),
             },
-            _ => Err("tried to execute transfer with non-supported status"),
+            _ => Err("Tried to execute transfer with non-supported status"),
         }
     }
 
@@ -404,13 +405,13 @@ impl<T: Trait> Module<T> {
         match message.action {
             Status::AddValidator => match message.status {
                 Status::Approved => Self::_add_validator(message),
-                _ => Err("tried to add validator with non-supported status"),
+                _ => Err("Tried to add validator with non-supported status"),
             },
             Status::RemoveValidator => match message.status {
                 Status::Approved => Self::_remove_validator(message),
-                _ => Err("tried to remove validator with non-supported status"),
+                _ => Err("Tried to remove validator with non-supported status"),
             },
-            _ => Err("tried to manage validator with non-supported status"),
+            _ => Err("Tried to manage validator with non-supported status"),
         }
     }
 
@@ -450,7 +451,6 @@ impl<T: Trait> Module<T> {
                 <Messages<T>>::insert(id, message);
             }
             Kind::Validator => {
-                println!("updated validator {:?} {:?}", status, kind);
                 let mut message = <ValidatorHistory<T>>::get(id);
                 message.status = status;
                 <ValidatorHistory<T>>::insert(id, message);
