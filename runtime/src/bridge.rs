@@ -147,6 +147,8 @@ pub trait Trait: token::Trait + system::Trait {
 
 decl_storage! {
     trait Store for Module<T: Trait> as Bridge {
+        BridgeIsOperational get(bridge_is_operational): bool = true;
+
         BridgeTransfers get(transfers): map ProposalId => BridgeTransfer<T::Hash>;
         BridgeTransfersCount get(bridge_transfers_count): ProposalId;
         Messages get(messages): map(T::Hash) => TransferMessage<T::AccountId, T::Hash>;
@@ -174,6 +176,7 @@ decl_module! {
         fn set_transfer(origin, to: H160, #[compact] amount: TokenBalance)-> Result
         {
             let from = ensure_signed(origin)?;
+            ensure!(Self::bridge_is_operational(), "Bridge is not operational");
 
             let transfer_hash = (&from, &to, amount, T::BlockNumber::sa(0)).using_encoded(<T as system::Trait>::Hashing::hash);
 
@@ -195,6 +198,7 @@ decl_module! {
         // ethereum-side multi-signed mint operation
         fn multi_signed_mint(origin, message_id: T::Hash, from: H160, to: T::AccountId, #[compact] amount: TokenBalance)-> Result {
             let validator = ensure_signed(origin)?;
+            ensure!(Self::bridge_is_operational(), "Bridge is not operational");
 
             Self::check_validator(validator)?;
 
@@ -220,6 +224,7 @@ decl_module! {
         // validator`s response to RelayMessage
         fn approve_transfer(origin, message_id: T::Hash) -> Result {
             let validator = ensure_signed(origin)?;
+            ensure!(Self::bridge_is_operational(), "Bridge is not operational");
             Self::check_validator(validator)?;
 
             let id = <TransferId<T>>::get(message_id);
@@ -229,6 +234,7 @@ decl_module! {
         // each validator calls it to add new validator
         fn add_validator(origin, address: T::AccountId) -> Result {
             let validator = ensure_signed(origin)?;
+            ensure!(Self::bridge_is_operational(), "Bridge is not operational");
             Self::check_validator(validator)?;
 
             ensure!(<ValidatorsCount<T>>::get() < 100_000, "Validators maximum reached.");
@@ -251,6 +257,32 @@ decl_module! {
         // each validator calls it to remove new validator
         fn remove_validator(origin, address: T::AccountId) -> Result {
             let validator = ensure_signed(origin)?;
+            ensure!(Self::bridge_is_operational(), "Bridge is not operational");
+            Self::check_validator(validator)?;
+
+            ensure!(<ValidatorsCount<T>>::get() > 1, "Can not remove last validator.");
+
+            let hash = ("remove", &address).using_encoded(<T as system::Trait>::Hashing::hash);
+
+            if !<ValidatorHistory<T>>::exists(hash) {
+                let message = ValidatorMessage {
+                    message_id: hash,
+                    account: address,
+                    action: Status::RemoveValidator,
+                    status: Status::RemoveValidator,
+                };
+                <ValidatorHistory<T>>::insert(hash, message);
+                Self::get_transfer_id_checked(hash, Kind::Validator)?;
+            }
+
+            let id = <TransferId<T>>::get(hash);
+            Self::_sign(id)
+        }
+
+        // each validator calls it to remove new validator
+        fn stop(origin, address: T::AccountId) -> Result {
+            let validator = ensure_signed(origin)?;
+            ensure!(Self::bridge_is_operational(), "Bridge is not operational");
             Self::check_validator(validator)?;
 
             ensure!(<ValidatorsCount<T>>::get() > 1, "Can not remove last validator.");
@@ -275,6 +307,7 @@ decl_module! {
         //confirm burn from validator
         fn confirm_transfer(origin, message_id: T::Hash) -> Result {
             let validator = ensure_signed(origin)?;
+            ensure!(Self::bridge_is_operational(), "Bridge is not operational");
             Self::check_validator(validator)?;
 
             let id = <TransferId<T>>::get(message_id);
@@ -293,6 +326,7 @@ decl_module! {
         //cancel burn from validator
         fn cancel_transfer(origin, message_id: T::Hash) -> Result {
             let validator = ensure_signed(origin)?;
+            ensure!(Self::bridge_is_operational(), "Bridge is not operational");
             Self::check_validator(validator)?;
 
             let mut message = <Messages<T>>::get(message_id);
