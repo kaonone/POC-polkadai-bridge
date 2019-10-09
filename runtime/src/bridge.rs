@@ -6,7 +6,6 @@ use crate::token;
 use crate::types::{MemberId, ProposalId, TokenBalance};
 use parity_codec::{Decode, Encode};
 use primitives::H160;
-use rstd::vec::Vec;
 use runtime_primitives::traits::{As, Hash};
 use support::{
     decl_event, decl_module, decl_storage, dispatch::Result, ensure, StorageMap, StorageValue,
@@ -26,6 +25,7 @@ pub struct BridgeTransfer<Hash> {
 #[derive(Encode, Decode, Clone, PartialEq)]
 #[cfg_attr(feature = "std", derive(Debug))]
 enum Status {
+    Revoked,
     Pending,
     AddValidator,
     RemoveValidator,
@@ -63,6 +63,13 @@ pub struct ValidatorMessage<AccountId, Hash> {
     status: Status,
 }
 
+#[derive(Encode, Decode, Clone, PartialEq)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub struct Validator<AccountId> {
+    id: usize,
+    account: AccountId,
+}
+
 impl<A, H> Default for TransferMessage<A, H>
 where
     A: Default,
@@ -89,8 +96,19 @@ where
         ValidatorMessage {
             message_id: H::default(),
             account: A::default(),
-            action: Status::AddValidator,
-            status: Status::AddValidator,
+            action: Status::Revoked,
+            status: Status::Revoked,
+        }
+    }
+}
+impl<A> Default for Validator<A>
+where
+    A: Default,
+{
+    fn default() -> Self {
+        Validator {
+            id: 0usize,
+            account: A::default(),
         }
     }
 }
@@ -135,9 +153,15 @@ decl_storage! {
         TransferId get(transfer_id_by_hash): map(T::Hash) => ProposalId;
         MessageId get(message_id_by_transfer_id): map(ProposalId) => T::Hash;
 
-        ValidatorsCount get(validators_count) config(): usize = 3;
-        ValidatorAccounts get(validator_accounts) config(): Vec<T::AccountId>;
+        ValidatorsCount get(validators_count) config(): u32 = 3;
         ValidatorHistory get(validator_history): map (T::Hash) => ValidatorMessage<T::AccountId, T::Hash>;
+        Validators get(validators) build(|config: &GenesisConfig<T>| {
+            config.validator_accounts.clone().into_iter()
+            .map(|acc: T::AccountId| (acc, true)).collect::<Vec<_>>()
+        }): map (T::AccountId) => bool;
+    }
+    add_extra_genesis {
+        config(validator_accounts): Vec<T::AccountId>;
     }
 }
 
@@ -296,9 +320,9 @@ impl<T: Trait> Module<T> {
             match message.status {
                 Status::Confirmed => (), // if burn is confirmed
                 _ => match transfer.kind {
-                        Kind::Transfer => message.status = Status::Approved,
-                        Kind::Validator => validator_message.status = Status::Approved,
-                    }
+                    Kind::Transfer => message.status = Status::Approved,
+                    Kind::Validator => validator_message.status = Status::Approved,
+                },
             }
             match transfer.kind {
                 Kind::Transfer => Self::execute_transfer(message)?,
@@ -308,7 +332,11 @@ impl<T: Trait> Module<T> {
         } else {
             match message.status {
                 Status::Confirmed => (),
-                _ => Self::update_status(transfer.message_id, Status::Pending, transfer.clone().kind)?,
+                _ => Self::update_status(
+                    transfer.message_id,
+                    Status::Pending,
+                    transfer.clone().kind,
+                )?,
             };
         }
 
@@ -328,22 +356,17 @@ impl<T: Trait> Module<T> {
 
     /// add validator
     fn _add_validator(info: ValidatorMessage<T::AccountId, T::Hash>) -> Result {
-        let mut validators = <ValidatorAccounts<T>>::get();
-        validators.push(info.account);
-        <ValidatorAccounts<T>>::put(validators);
+        <Validators<T>>::insert(info.account, true);
         <ValidatorsCount<T>>::mutate(|x| *x += 1);
         Self::update_status(info.message_id, Status::Confirmed, Kind::Validator)
     }
 
     /// remove validator
     fn _remove_validator(info: ValidatorMessage<T::AccountId, T::Hash>) -> Result {
-        let mut validators = <ValidatorAccounts<T>>::get();
-        validators.retain(|x| *x != info.account);
-        <ValidatorAccounts<T>>::put(validators);
+        <Validators<T>>::remove(info.account);
         <ValidatorsCount<T>>::mutate(|x| *x -= 1);
         <ValidatorHistory<T>>::remove(info.message_id);
-
-        Self::update_status(info.message_id, Status::Confirmed, Kind::Validator)
+        Ok(())
     }
 
     /// check votes validity
@@ -470,10 +493,8 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
     fn check_validator(validator: T::AccountId) -> Result {
-        let is_trusted = <ValidatorAccounts<T>>::get()
-            .iter()
-            .any(|a| *a == validator);
-        ensure!(is_trusted, "only validators can call this function");
+        let is_trusted = <Validators<T>>::exists(validator);
+        ensure!(is_trusted, "Only validators can call this function");
 
         Ok(())
     }
@@ -809,7 +830,7 @@ mod tests {
 
             assert_ok!(BridgeModule::remove_validator(Origin::signed(V1), V3));
             message = BridgeModule::validator_history(id);
-            assert_eq!(message.status, Status::Confirmed);
+            assert_eq!(message.status, Status::Revoked);
             assert_eq!(BridgeModule::validators_count(), 2);
         })
     }
@@ -822,7 +843,7 @@ mod tests {
 
             //TODO: deal with two validators corner case
             assert_ok!(BridgeModule::remove_validator(Origin::signed(V1), V2));
-            assert_ok!(BridgeModule::remove_validator(Origin::signed(V2), V2)); 
+            assert_ok!(BridgeModule::remove_validator(Origin::signed(V2), V2));
             // ^ this guy probably will not sign his removal ^
 
             assert_eq!(BridgeModule::validators_count(), 1);
