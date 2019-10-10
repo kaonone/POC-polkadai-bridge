@@ -3,130 +3,17 @@
 /// and transfer tokens on substrate side freely
 ///
 use crate::token;
-use crate::types::{MemberId, ProposalId, TokenBalance};
-use parity_codec::{Decode, Encode};
+use crate::types::{
+    BridgeMessage, BridgeTransfer, Kind, MemberId, ProposalId, Status, TokenBalance,
+    TransferMessage, ValidatorMessage,
+};
+use parity_codec::Encode;
 use primitives::H160;
 use runtime_primitives::traits::{As, Hash};
 use support::{
     decl_event, decl_module, decl_storage, dispatch::Result, ensure, StorageMap, StorageValue,
 };
 use system::{self, ensure_signed};
-
-#[derive(Encode, Decode, Clone, PartialEq)]
-#[cfg_attr(feature = "std", derive(Debug))]
-pub struct BridgeTransfer<Hash> {
-    transfer_id: ProposalId,
-    message_id: Hash,
-    open: bool,
-    votes: MemberId,
-    kind: Kind,
-}
-
-#[derive(Encode, Decode, Clone, PartialEq)]
-#[cfg_attr(feature = "std", derive(Debug))]
-enum Status {
-    Revoked,
-    Pending,
-    AddValidator,
-    RemoveValidator,
-    Deposit,
-    Withdraw,
-    Approved,
-    Canceled,
-    Confirmed,
-}
-
-#[derive(Encode, Decode, Clone, PartialEq)]
-#[cfg_attr(feature = "std", derive(Debug))]
-enum Kind {
-    Transfer,
-    Validator,
-}
-
-#[derive(Encode, Decode, Clone, PartialEq)]
-#[cfg_attr(feature = "std", derive(Debug))]
-pub struct TransferMessage<AccountId, Hash> {
-    message_id: Hash,
-    eth_address: H160,
-    substrate_address: AccountId,
-    amount: TokenBalance,
-    status: Status,
-    action: Status,
-}
-
-#[derive(Encode, Decode, Clone, PartialEq)]
-#[cfg_attr(feature = "std", derive(Debug))]
-pub struct ValidatorMessage<AccountId, Hash> {
-    message_id: Hash,
-    account: AccountId,
-    action: Status,
-    status: Status,
-}
-
-#[derive(Encode, Decode, Clone, PartialEq)]
-#[cfg_attr(feature = "std", derive(Debug))]
-pub struct Validator<AccountId> {
-    id: usize,
-    account: AccountId,
-}
-
-impl<A, H> Default for TransferMessage<A, H>
-where
-    A: Default,
-    H: Default,
-{
-    fn default() -> Self {
-        TransferMessage {
-            message_id: H::default(),
-            eth_address: H160::default(),
-            substrate_address: A::default(),
-            amount: TokenBalance::default(),
-            status: Status::Withdraw,
-            action: Status::Withdraw,
-        }
-    }
-}
-
-impl<A, H> Default for ValidatorMessage<A, H>
-where
-    A: Default,
-    H: Default,
-{
-    fn default() -> Self {
-        ValidatorMessage {
-            message_id: H::default(),
-            account: A::default(),
-            action: Status::Revoked,
-            status: Status::Revoked,
-        }
-    }
-}
-impl<A> Default for Validator<A>
-where
-    A: Default,
-{
-    fn default() -> Self {
-        Validator {
-            id: 0usize,
-            account: A::default(),
-        }
-    }
-}
-
-impl<H> Default for BridgeTransfer<H>
-where
-    H: Default,
-{
-    fn default() -> Self {
-        BridgeTransfer {
-            transfer_id: ProposalId::default(),
-            message_id: H::default(),
-            open: true,
-            votes: MemberId::default(),
-            kind: Kind::Transfer,
-        }
-    }
-}
 
 decl_event!(
     pub enum Event<T>
@@ -148,12 +35,14 @@ pub trait Trait: token::Trait + system::Trait {
 decl_storage! {
     trait Store for Module<T: Trait> as Bridge {
         BridgeIsOperational get(bridge_is_operational): bool = true;
+        BridgeMessages get(bridge_messages): map (T::Hash) => BridgeMessage<T::AccountId, T::Hash>;
 
         BridgeTransfers get(transfers): map ProposalId => BridgeTransfer<T::Hash>;
         BridgeTransfersCount get(bridge_transfers_count): ProposalId;
         Messages get(messages): map(T::Hash) => TransferMessage<T::AccountId, T::Hash>;
         TransferId get(transfer_id_by_hash): map(T::Hash) => ProposalId;
         MessageId get(message_id_by_transfer_id): map(ProposalId) => T::Hash;
+
 
         ValidatorsCount get(validators_count) config(): u32 = 3;
         ValidatorHistory get(validator_history): map (T::Hash) => ValidatorMessage<T::AccountId, T::Hash>;
@@ -279,25 +168,45 @@ decl_module! {
             Self::_sign(id)
         }
 
-        // each validator calls it to remove new validator
-        fn stop(origin, address: T::AccountId) -> Result {
+        // each validator calls it to pause the bridge
+        fn pause_bridge(origin) -> Result {
             let validator = ensure_signed(origin)?;
-            ensure!(Self::bridge_is_operational(), "Bridge is not operational");
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
 
-            ensure!(<ValidatorsCount<T>>::get() > 1, "Can not remove last validator.");
+            let hash = ("pause", T::BlockNumber::sa(0)).using_encoded(<T as system::Trait>::Hashing::hash);
 
-            let hash = ("remove", &address).using_encoded(<T as system::Trait>::Hashing::hash);
-
-            if !<ValidatorHistory<T>>::exists(hash) {
-                let message = ValidatorMessage {
+            if !<BridgeMessages<T>>::exists(hash) {
+                let message = BridgeMessage {
                     message_id: hash,
-                    account: address,
-                    action: Status::RemoveValidator,
-                    status: Status::RemoveValidator,
+                    account: validator,
+                    action: Status::PauseTheBridge,
+                    status: Status::PauseTheBridge,
                 };
-                <ValidatorHistory<T>>::insert(hash, message);
-                Self::get_transfer_id_checked(hash, Kind::Validator)?;
+                <BridgeMessages<T>>::insert(hash, message);
+                Self::get_transfer_id_checked(hash, Kind::Bridge)?;
+            }
+
+            let id = <TransferId<T>>::get(hash);
+            Self::_sign(id)
+        }
+
+        // each validator calls it to resume the bridge
+        fn resume_bridge(origin) -> Result {
+            let validator = ensure_signed(origin)?;
+            Self::check_validator(validator.clone())?;
+
+
+            let hash = ("resume", T::BlockNumber::sa(0)).using_encoded(<T as system::Trait>::Hashing::hash);
+
+            if !<BridgeMessages<T>>::exists(hash) {
+                let message = BridgeMessage {
+                    message_id: hash,
+                    account: validator,
+                    action: Status::ResumeTheBridge,
+                    status: Status::ResumeTheBridge,
+                };
+                <BridgeMessages<T>>::insert(hash, message);
+                Self::get_transfer_id_checked(hash, Kind::Bridge)?;
             }
 
             let id = <TransferId<T>>::get(hash);
@@ -346,8 +255,8 @@ impl<T: Trait> Module<T> {
 
         let mut message = <Messages<T>>::get(transfer.message_id);
         let mut validator_message = <ValidatorHistory<T>>::get(transfer.message_id);
+        let mut bridge_message = <BridgeMessages<T>>::get(transfer.message_id);
         ensure!(transfer.open, "This transfer is not open");
-
         transfer.votes += 1;
 
         if Self::votes_are_enough(transfer.votes) {
@@ -356,11 +265,13 @@ impl<T: Trait> Module<T> {
                 _ => match transfer.kind {
                     Kind::Transfer => message.status = Status::Approved,
                     Kind::Validator => validator_message.status = Status::Approved,
+                    Kind::Bridge => bridge_message.status = Status::Approved,
                 },
             }
             match transfer.kind {
                 Kind::Transfer => Self::execute_transfer(message)?,
                 Kind::Validator => Self::manage_validator(validator_message)?,
+                Kind::Bridge => Self::manage_bridge(bridge_message)?,
             }
             transfer.open = false;
         } else {
@@ -386,6 +297,16 @@ impl<T: Trait> Module<T> {
         }
 
         Ok(())
+    }
+
+    fn pause_the_bridge(message: BridgeMessage<T::AccountId, T::Hash>) -> Result {
+        <BridgeIsOperational<T>>::mutate(|x| *x = false);
+        Self::update_status(message.message_id, Status::Confirmed, Kind::Bridge)
+    }
+
+    fn resume_the_bridge(message: BridgeMessage<T::AccountId, T::Hash>) -> Result {
+        <BridgeIsOperational<T>>::mutate(|x| *x = true);
+        Self::update_status(message.message_id, Status::Confirmed, Kind::Bridge)
     }
 
     /// add validator
@@ -472,6 +393,20 @@ impl<T: Trait> Module<T> {
         }
     }
 
+    fn manage_bridge(message: BridgeMessage<T::AccountId, T::Hash>) -> Result {
+        match message.action {
+            Status::PauseTheBridge => match message.status {
+                Status::Approved => Self::pause_the_bridge(message),
+                _ => Err("Tried to pause the bridge with non-supported status"),
+            },
+            Status::ResumeTheBridge => match message.status {
+                Status::Approved => Self::resume_the_bridge(message),
+                _ => Err("Tried to resume the bridge with non-supported status"),
+            },
+            _ => Err("Tried to manage bridge with non-supported status"),
+        }
+    }
+
     fn create_transfer(transfer_hash: T::Hash, kind: Kind) -> Result {
         ensure!(
             !<TransferId<T>>::exists(transfer_hash),
@@ -493,7 +428,7 @@ impl<T: Trait> Module<T> {
         };
 
         <BridgeTransfers<T>>::insert(transfer_id, transfer);
-        <BridgeTransfersCount<T>>::mutate(|count| *count += new_bridge_transfers_count);
+        <BridgeTransfersCount<T>>::mutate(|count| *count = new_bridge_transfers_count);
         <TransferId<T>>::insert(transfer_hash, transfer_id);
         <MessageId<T>>::insert(transfer_id, transfer_hash);
 
@@ -511,6 +446,11 @@ impl<T: Trait> Module<T> {
                 let mut message = <ValidatorHistory<T>>::get(id);
                 message.status = status;
                 <ValidatorHistory<T>>::insert(id, message);
+            }
+            Kind::Bridge => {
+                let mut message = <BridgeMessages<T>>::get(id);
+                message.status = status;
+                <BridgeMessages<T>>::insert(id, message);
             }
         }
         Ok(())
@@ -633,7 +573,7 @@ mod tests {
 
         r.extend(
             GenesisConfig::<Test> {
-                validators_count: 3usize,
+                validators_count: 3u32,
                 validator_accounts: vec![V1, V2, V3],
             }
             .build_storage()
@@ -884,6 +824,57 @@ mod tests {
             // TODO: fails through different hashes
             // assert_ok fails with corect error but the noop below fails with different hashes
             // assert_noop!(BridgeModule::remove_validator(Origin::signed(V1), V1), "Cant remove last validator");
+        })
+    }
+    #[test]
+    fn pause_the_bridge_should_work() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_ok!(BridgeModule::pause_bridge(Origin::signed(V2)));
+
+            assert_eq!(BridgeModule::bridge_transfers_count(), 1);
+            assert_eq!(BridgeModule::bridge_is_operational(), true);
+            let id = BridgeModule::message_id_by_transfer_id(0);
+            let mut message = BridgeModule::bridge_messages(id);
+            assert_eq!(message.status, Status::Pending);
+
+            assert_ok!(BridgeModule::pause_bridge(Origin::signed(V1)));
+            assert_eq!(BridgeModule::bridge_is_operational(), false);
+            message = BridgeModule::bridge_messages(id);
+            assert_eq!(message.status, Status::Confirmed);
+        })
+    }
+    #[test]
+    fn extrinsics_restricted_should_fail() {
+        with_externalities(&mut new_test_ext(), || {
+            let eth_message_id = H256::from(ETH_MESSAGE_ID);
+            let eth_address = H160::from(ETH_ADDRESS);
+
+            assert_ok!(BridgeModule::pause_bridge(Origin::signed(V2)));
+            assert_ok!(BridgeModule::pause_bridge(Origin::signed(V1)));
+
+            // substrate <-- Ethereum
+            assert_noop!(
+                BridgeModule::multi_signed_mint(
+                    Origin::signed(V2),
+                    eth_message_id,
+                    eth_address,
+                    USER2,
+                    1000
+                ),
+                "Bridge is not operational"
+            );
+        })
+    }
+    #[test]
+    fn pause_and_resume_the_bridge_should_work() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_eq!(BridgeModule::bridge_is_operational(), true);
+            assert_ok!(BridgeModule::pause_bridge(Origin::signed(V2)));
+            assert_ok!(BridgeModule::pause_bridge(Origin::signed(V1)));
+            assert_eq!(BridgeModule::bridge_is_operational(), false);
+            assert_ok!(BridgeModule::resume_bridge(Origin::signed(V1)));
+            assert_ok!(BridgeModule::resume_bridge(Origin::signed(V2)));
+            assert_eq!(BridgeModule::bridge_is_operational(), true);
         })
     }
 }
