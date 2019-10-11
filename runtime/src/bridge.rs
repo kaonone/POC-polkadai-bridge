@@ -45,6 +45,7 @@ decl_storage! {
 
 
         ValidatorsCount get(validators_count) config(): u32 = 3;
+        ValidatorVotes get(validator_votes): map(ProposalId) => Vec<T::AccountId>;
         ValidatorHistory get(validator_history): map (T::Hash) => ValidatorMessage<T::AccountId, T::Hash>;
         Validators get(validators) build(|config: &GenesisConfig<T>| {
             config.validator_accounts.clone().into_iter()
@@ -89,7 +90,7 @@ decl_module! {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
 
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
 
             if !<Messages<T>>::exists(message_id) {
                 let message = TransferMessage{
@@ -105,7 +106,7 @@ decl_module! {
             }
 
             let transfer_id = <TransferId<T>>::get(message_id);
-            Self::_sign(transfer_id)?;
+            Self::_sign(validator, transfer_id)?;
 
             Ok(())
         }
@@ -114,17 +115,17 @@ decl_module! {
         fn approve_transfer(origin, message_id: T::Hash) -> Result {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
 
             let id = <TransferId<T>>::get(message_id);
-            Self::_sign(id)
+            Self::_sign(validator, id)
         }
 
         // each validator calls it to add new validator
         fn add_validator(origin, address: T::AccountId) -> Result {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
 
             ensure!(<ValidatorsCount<T>>::get() < 100_000, "Validators maximum reached.");
             let hash = ("add", &address).using_encoded(<T as system::Trait>::Hashing::hash);
@@ -141,13 +142,13 @@ decl_module! {
             }
 
             let id = <TransferId<T>>::get(hash);
-            Self::_sign(id)
+            Self::_sign(validator, id)
         }
         // each validator calls it to remove new validator
         fn remove_validator(origin, address: T::AccountId) -> Result {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
 
             ensure!(<ValidatorsCount<T>>::get() > 1, "Can not remove last validator.");
 
@@ -165,7 +166,7 @@ decl_module! {
             }
 
             let id = <TransferId<T>>::get(hash);
-            Self::_sign(id)
+            Self::_sign(validator, id)
         }
 
         // each validator calls it to pause the bridge
@@ -178,7 +179,7 @@ decl_module! {
             if !<BridgeMessages<T>>::exists(hash) {
                 let message = BridgeMessage {
                     message_id: hash,
-                    account: validator,
+                    account: validator.clone(),
                     action: Status::PauseTheBridge,
                     status: Status::PauseTheBridge,
                 };
@@ -187,7 +188,7 @@ decl_module! {
             }
 
             let id = <TransferId<T>>::get(hash);
-            Self::_sign(id)
+            Self::_sign(validator, id)
         }
 
         // each validator calls it to resume the bridge
@@ -201,7 +202,7 @@ decl_module! {
             if !<BridgeMessages<T>>::exists(hash) {
                 let message = BridgeMessage {
                     message_id: hash,
-                    account: validator,
+                    account: validator.clone(),
                     action: Status::ResumeTheBridge,
                     status: Status::ResumeTheBridge,
                 };
@@ -210,14 +211,14 @@ decl_module! {
             }
 
             let id = <TransferId<T>>::get(hash);
-            Self::_sign(id)
+            Self::_sign(validator, id)
         }
 
         //confirm burn from validator
         fn confirm_transfer(origin, message_id: T::Hash) -> Result {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
 
             let id = <TransferId<T>>::get(message_id);
 
@@ -227,7 +228,7 @@ decl_module! {
 
             Self::update_status(message_id, Status::Confirmed, Kind::Transfer)?;
             Self::reopen_for_burn_confirmation(message_id)?;
-            Self::_sign(id)?;
+            Self::_sign(validator, id)?;
 
             Ok(())
         }
@@ -250,12 +251,14 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    fn _sign(transfer_id: ProposalId) -> Result {
+    fn _sign(validator: T::AccountId,transfer_id: ProposalId) -> Result {
         let mut transfer = <BridgeTransfers<T>>::get(transfer_id);
 
         let mut message = <Messages<T>>::get(transfer.message_id);
         let mut validator_message = <ValidatorHistory<T>>::get(transfer.message_id);
         let mut bridge_message = <BridgeMessages<T>>::get(transfer.message_id);
+        let voted_list = <ValidatorVotes<T>>::get(transfer_id);
+        ensure!(!voted_list.iter().any(|x| *x == validator), "This validator has already voted.");
         ensure!(transfer.open, "This transfer is not open");
         transfer.votes += 1;
 
@@ -285,6 +288,7 @@ impl<T: Trait> Module<T> {
             };
         }
 
+        <ValidatorVotes<T>>::mutate(transfer_id, |a| a.push(validator));
         <BridgeTransfers<T>>::insert(transfer_id, transfer);
 
         Ok(())
@@ -417,8 +421,8 @@ impl<T: Trait> Module<T> {
         let bridge_transfers_count = <BridgeTransfersCount<T>>::get();
         let new_bridge_transfers_count = bridge_transfers_count
             .checked_add(1)
-            .ok_or("Overflow adding a new bridge transfer")?;
 
+            .ok_or("Overflow adding a new bridge transfer")?;
         let transfer = BridgeTransfer {
             transfer_id,
             message_id: transfer_hash,
@@ -455,6 +459,8 @@ impl<T: Trait> Module<T> {
         }
         Ok(())
     }
+
+    // needed because @message_id will be the same as initial
     fn reopen_for_burn_confirmation(message_id: T::Hash) -> Result {
         let message = <Messages<T>>::get(message_id);
         let transfer_id = <TransferId<T>>::get(message_id);
@@ -463,6 +469,7 @@ impl<T: Trait> Module<T> {
             transfer.votes = 0;
             transfer.open = true;
             <BridgeTransfers<T>>::insert(transfer_id, transfer);
+            <ValidatorVotes<T>>::mutate(transfer_id, |a| a.clear());
         }
         Ok(())
     }
@@ -875,6 +882,15 @@ mod tests {
             assert_ok!(BridgeModule::resume_bridge(Origin::signed(V1)));
             assert_ok!(BridgeModule::resume_bridge(Origin::signed(V2)));
             assert_eq!(BridgeModule::bridge_is_operational(), true);
+        })
+    }
+
+    #[test]
+    fn double_vote_should_fail() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_eq!(BridgeModule::bridge_is_operational(), true);
+            assert_ok!(BridgeModule::pause_bridge(Origin::signed(V2)));
+            assert_noop!(BridgeModule::pause_bridge(Origin::signed(V2)), "This validator has already voted.");
         })
     }
 }
