@@ -4,7 +4,6 @@
 ///
 use crate::token;
 use crate::types::{MemberId, ProposalId, TokenBalance};
-use rstd::vec::Vec;
 use parity_codec::{Decode, Encode};
 use primitives::H160;
 use runtime_primitives::traits::{As, Hash};
@@ -20,12 +19,16 @@ pub struct BridgeTransfer<Hash> {
     message_id: Hash,
     open: bool,
     votes: MemberId,
+    kind: Kind,
 }
 
 #[derive(Encode, Decode, Clone, PartialEq)]
 #[cfg_attr(feature = "std", derive(Debug))]
 enum Status {
+    Revoked,
     Pending,
+    AddValidator,
+    RemoveValidator,
     Deposit,
     Withdraw,
     Approved,
@@ -35,31 +38,81 @@ enum Status {
 
 #[derive(Encode, Decode, Clone, PartialEq)]
 #[cfg_attr(feature = "std", derive(Debug))]
-pub struct Message<AccountId, Hash> {
+enum Kind {
+    Transfer,
+    Validator,
+}
+
+#[derive(Encode, Decode, Clone, PartialEq)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub struct TransferMessage<AccountId, Hash> {
     message_id: Hash,
     eth_address: H160,
     substrate_address: AccountId,
     amount: TokenBalance,
     status: Status,
-    direction: Status,
+    action: Status,
 }
 
-impl<A, H> Default for Message<A, H>
+#[derive(Encode, Decode, Clone, PartialEq)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub struct ValidatorMessage<AccountId, Hash> {
+    message_id: Hash,
+    account: AccountId,
+    action: Status,
+    status: Status,
+}
+
+#[derive(Encode, Decode, Clone, PartialEq)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub struct Validator<AccountId> {
+    id: usize,
+    account: AccountId,
+}
+
+impl<A, H> Default for TransferMessage<A, H>
 where
     A: Default,
     H: Default,
 {
     fn default() -> Self {
-        Message {
+        TransferMessage {
             message_id: H::default(),
             eth_address: H160::default(),
             substrate_address: A::default(),
             amount: TokenBalance::default(),
             status: Status::Withdraw,
-            direction: Status::Withdraw,
+            action: Status::Withdraw,
         }
     }
 }
+
+impl<A, H> Default for ValidatorMessage<A, H>
+where
+    A: Default,
+    H: Default,
+{
+    fn default() -> Self {
+        ValidatorMessage {
+            message_id: H::default(),
+            account: A::default(),
+            action: Status::Revoked,
+            status: Status::Revoked,
+        }
+    }
+}
+impl<A> Default for Validator<A>
+where
+    A: Default,
+{
+    fn default() -> Self {
+        Validator {
+            id: 0usize,
+            account: A::default(),
+        }
+    }
+}
+
 impl<H> Default for BridgeTransfer<H>
 where
     H: Default,
@@ -70,6 +123,7 @@ where
             message_id: H::default(),
             open: true,
             votes: MemberId::default(),
+            kind: Kind::Transfer,
         }
     }
 }
@@ -95,12 +149,19 @@ decl_storage! {
     trait Store for Module<T: Trait> as Bridge {
         BridgeTransfers get(transfers): map ProposalId => BridgeTransfer<T::Hash>;
         BridgeTransfersCount get(bridge_transfers_count): ProposalId;
-        Messages get(messages): map(T::Hash) => Message<T::AccountId, T::Hash>;
+        Messages get(messages): map(T::Hash) => TransferMessage<T::AccountId, T::Hash>;
         TransferId get(transfer_id_by_hash): map(T::Hash) => ProposalId;
         MessageId get(message_id_by_transfer_id): map(ProposalId) => T::Hash;
 
-        ValidatorsCount get(validators_count) config(): usize = 3;
-        ValidatorAccounts get(validator_accounts) config(): Vec<T::AccountId>;
+        ValidatorsCount get(validators_count) config(): u32 = 3;
+        ValidatorHistory get(validator_history): map (T::Hash) => ValidatorMessage<T::AccountId, T::Hash>;
+        Validators get(validators) build(|config: &GenesisConfig<T>| {
+            config.validator_accounts.clone().into_iter()
+            .map(|acc: T::AccountId| (acc, true)).collect::<Vec<_>>()
+        }): map (T::AccountId) => bool;
+    }
+    add_extra_genesis {
+        config(validator_accounts): Vec<T::AccountId>;
     }
 }
 
@@ -116,15 +177,15 @@ decl_module! {
 
             let transfer_hash = (&from, &to, amount, T::BlockNumber::sa(0)).using_encoded(<T as system::Trait>::Hashing::hash);
 
-            let message = Message{
+            let message = TransferMessage{
                 message_id: transfer_hash,
                 eth_address: to,
                 substrate_address: from,
                 amount,
                 status: Status::Withdraw,
-                direction: Status::Withdraw,
+                action: Status::Withdraw,
             };
-            Self::get_transfer_id_checked(transfer_hash)?;
+            Self::get_transfer_id_checked(transfer_hash, Kind::Transfer)?;
             Self::deposit_event(RawEvent::RelayMessage(transfer_hash));
 
             <Messages<T>>::insert(transfer_hash, message);
@@ -138,16 +199,16 @@ decl_module! {
             Self::check_validator(validator)?;
 
             if !<Messages<T>>::exists(message_id) {
-                let message = Message{
+                let message = TransferMessage{
                     message_id,
                     eth_address: from,
                     substrate_address: to,
                     amount,
                     status: Status::Deposit,
-                    direction: Status::Deposit,
+                    action: Status::Deposit,
                 };
                 <Messages<T>>::insert(message_id, message);
-                Self::get_transfer_id_checked(message_id)?;
+                Self::get_transfer_id_checked(message_id, Kind::Transfer)?;
             }
 
             let transfer_id = <TransferId<T>>::get(message_id);
@@ -162,7 +223,52 @@ decl_module! {
             Self::check_validator(validator)?;
 
             let id = <TransferId<T>>::get(message_id);
+            Self::_sign(id)
+        }
 
+        // each validator calls it to add new validator
+        fn add_validator(origin, address: T::AccountId) -> Result {
+            let validator = ensure_signed(origin)?;
+            Self::check_validator(validator)?;
+
+            ensure!(<ValidatorsCount<T>>::get() < 100_000, "Validators maximum reached.");
+            let hash = ("add", &address).using_encoded(<T as system::Trait>::Hashing::hash);
+
+            if !<ValidatorHistory<T>>::exists(hash) {
+                let message = ValidatorMessage {
+                    message_id: hash,
+                    account: address,
+                    action: Status::AddValidator,
+                    status: Status::AddValidator,
+                };
+                <ValidatorHistory<T>>::insert(hash, message);
+                Self::get_transfer_id_checked(hash, Kind::Validator)?;
+            }
+
+            let id = <TransferId<T>>::get(hash);
+            Self::_sign(id)
+        }
+        // each validator calls it to remove new validator
+        fn remove_validator(origin, address: T::AccountId) -> Result {
+            let validator = ensure_signed(origin)?;
+            Self::check_validator(validator)?;
+
+            ensure!(<ValidatorsCount<T>>::get() > 1, "Can not remove last validator.");
+
+            let hash = ("remove", &address).using_encoded(<T as system::Trait>::Hashing::hash);
+
+            if !<ValidatorHistory<T>>::exists(hash) {
+                let message = ValidatorMessage {
+                    message_id: hash,
+                    account: address,
+                    action: Status::RemoveValidator,
+                    status: Status::RemoveValidator,
+                };
+                <ValidatorHistory<T>>::insert(hash, message);
+                Self::get_transfer_id_checked(hash, Kind::Validator)?;
+            }
+
+            let id = <TransferId<T>>::get(hash);
             Self::_sign(id)
         }
 
@@ -177,7 +283,7 @@ decl_module! {
             <Messages<T>>::get(message_id).status == Status::Confirmed;
             ensure!(is_approved, "This transfer must be approved first.");
 
-            Self::update_status(message_id, Status::Confirmed)?;
+            Self::update_status(message_id, Status::Confirmed, Kind::Transfer)?;
             Self::reopen_for_burn_confirmation(message_id)?;
             Self::_sign(id)?;
 
@@ -203,7 +309,9 @@ decl_module! {
 impl<T: Trait> Module<T> {
     fn _sign(transfer_id: ProposalId) -> Result {
         let mut transfer = <BridgeTransfers<T>>::get(transfer_id);
+
         let mut message = <Messages<T>>::get(transfer.message_id);
+        let mut validator_message = <ValidatorHistory<T>>::get(transfer.message_id);
         ensure!(transfer.open, "This transfer is not open");
 
         transfer.votes += 1;
@@ -211,14 +319,24 @@ impl<T: Trait> Module<T> {
         if Self::votes_are_enough(transfer.votes) {
             match message.status {
                 Status::Confirmed => (), // if burn is confirmed
-                _ => message.status = Status::Approved,
-            };
-            Self::execute_transfer(message)?;
+                _ => match transfer.kind {
+                    Kind::Transfer => message.status = Status::Approved,
+                    Kind::Validator => validator_message.status = Status::Approved,
+                },
+            }
+            match transfer.kind {
+                Kind::Transfer => Self::execute_transfer(message)?,
+                Kind::Validator => Self::manage_validator(validator_message)?,
+            }
             transfer.open = false;
         } else {
             match message.status {
                 Status::Confirmed => (),
-                _ => Self::update_status(transfer.message_id, Status::Pending)?,
+                _ => Self::update_status(
+                    transfer.message_id,
+                    Status::Pending,
+                    transfer.clone().kind,
+                )?,
             };
         }
 
@@ -228,14 +346,30 @@ impl<T: Trait> Module<T> {
     }
 
     ///ensure that such transfer exist
-    fn get_transfer_id_checked(transfer_hash: T::Hash) -> Result {
+    fn get_transfer_id_checked(transfer_hash: T::Hash, kind: Kind) -> Result {
         if !<TransferId<T>>::exists(transfer_hash) {
-            Self::create_transfer(transfer_hash)?;
+            Self::create_transfer(transfer_hash, kind)?;
         }
 
         Ok(())
     }
 
+    /// add validator
+    fn _add_validator(info: ValidatorMessage<T::AccountId, T::Hash>) -> Result {
+        <Validators<T>>::insert(info.account, true);
+        <ValidatorsCount<T>>::mutate(|x| *x += 1);
+        Self::update_status(info.message_id, Status::Confirmed, Kind::Validator)
+    }
+
+    /// remove validator
+    fn _remove_validator(info: ValidatorMessage<T::AccountId, T::Hash>) -> Result {
+        <Validators<T>>::remove(info.account);
+        <ValidatorsCount<T>>::mutate(|x| *x -= 1);
+        <ValidatorHistory<T>>::remove(info.message_id);
+        Ok(())
+    }
+
+    /// check votes validity
     fn votes_are_enough(votes: MemberId) -> bool {
         votes as f64 / Self::validators_count() as f64 >= 0.51
     }
@@ -259,16 +393,16 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    fn execute_transfer(message: Message<T::AccountId, T::Hash>) -> Result {
-        match message.direction {
+    fn execute_transfer(message: TransferMessage<T::AccountId, T::Hash>) -> Result {
+        match message.action {
             Status::Deposit => match message.status {
                 Status::Approved => {
                     let to = message.substrate_address.clone();
                     <token::Module<T>>::_mint(to, message.amount)?;
                     Self::deposit_event(RawEvent::Minted(message.message_id));
-                    Self::update_status(message.message_id, Status::Confirmed)
+                    Self::update_status(message.message_id, Status::Confirmed, Kind::Transfer)
                 }
-                _ => Err("tried to deposit with non-supported status"),
+                _ => Err("Tried to deposit with non-supported status"),
             },
             Status::Withdraw => match message.status {
                 Status::Confirmed => Self::execute_burn(message.message_id),
@@ -282,14 +416,29 @@ impl<T: Trait> Module<T> {
                         to,
                         message.amount,
                     ));
-                    Self::update_status(message.message_id, Status::Approved)
+                    Self::update_status(message.message_id, Status::Approved, Kind::Transfer)
                 }
-                _ => Err("tried to withdraw with non-supported status"),
+                _ => Err("Tried to withdraw with non-supported status"),
             },
-            _ => Err("tried to execute transfer with non-supported status"),
+            _ => Err("Tried to execute transfer with non-supported status"),
         }
     }
-    fn create_transfer(transfer_hash: T::Hash) -> Result {
+
+    fn manage_validator(message: ValidatorMessage<T::AccountId, T::Hash>) -> Result {
+        match message.action {
+            Status::AddValidator => match message.status {
+                Status::Approved => Self::_add_validator(message),
+                _ => Err("Tried to add validator with non-supported status"),
+            },
+            Status::RemoveValidator => match message.status {
+                Status::Approved => Self::_remove_validator(message),
+                _ => Err("Tried to remove validator with non-supported status"),
+            },
+            _ => Err("Tried to manage validator with non-supported status"),
+        }
+    }
+
+    fn create_transfer(transfer_hash: T::Hash, kind: Kind) -> Result {
         ensure!(
             !<TransferId<T>>::exists(transfer_hash),
             "This transfer already open"
@@ -306,6 +455,7 @@ impl<T: Trait> Module<T> {
             message_id: transfer_hash,
             open: true,
             votes: 0,
+            kind,
         };
 
         <BridgeTransfers<T>>::insert(transfer_id, transfer);
@@ -316,10 +466,19 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    fn update_status(id: T::Hash, status: Status) -> Result {
-        let mut message = <Messages<T>>::get(id);
-        message.status = status;
-        <Messages<T>>::insert(id, message);
+    fn update_status(id: T::Hash, status: Status, kind: Kind) -> Result {
+        match kind {
+            Kind::Transfer => {
+                let mut message = <Messages<T>>::get(id);
+                message.status = status;
+                <Messages<T>>::insert(id, message);
+            }
+            Kind::Validator => {
+                let mut message = <ValidatorHistory<T>>::get(id);
+                message.status = status;
+                <ValidatorHistory<T>>::insert(id, message);
+            }
+        }
         Ok(())
     }
     fn reopen_for_burn_confirmation(message_id: T::Hash) -> Result {
@@ -334,8 +493,8 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
     fn check_validator(validator: T::AccountId) -> Result {
-        let is_trusted = <ValidatorAccounts<T>>::get().iter().any(|a| *a == validator);
-        ensure!(is_trusted, "only validators can call this function");
+        let is_trusted = <Validators<T>>::exists(validator);
+        ensure!(is_trusted, "Only validators can call this function");
 
         Ok(())
     }
@@ -405,6 +564,7 @@ mod tests {
     const V1: u64 = 1;
     const V2: u64 = 2;
     const V3: u64 = 3;
+    const V4: u64 = 4;
     const USER1: u64 = 4;
     const USER2: u64 = 5;
 
@@ -440,7 +600,7 @@ mod tests {
         r.extend(
             GenesisConfig::<Test> {
                 validators_count: 3usize,
-                validator_accounts: vec![V1, V2, V3]
+                validator_accounts: vec![V1, V2, V3],
             }
             .build_storage()
             .unwrap()
@@ -644,6 +804,52 @@ mod tests {
                 BridgeModule::confirm_transfer(Origin::signed(V1), sub_message_id),
                 "This transfer must be approved first."
             );
+        })
+    }
+    #[test]
+    fn add_validator_should_work() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_ok!(BridgeModule::add_validator(Origin::signed(V2), V4));
+            let id = BridgeModule::message_id_by_transfer_id(0);
+            let mut message = BridgeModule::validator_history(id);
+            assert_eq!(message.status, Status::Pending);
+
+            assert_ok!(BridgeModule::add_validator(Origin::signed(V1), V4));
+            message = BridgeModule::validator_history(id);
+            assert_eq!(message.status, Status::Confirmed);
+            assert_eq!(BridgeModule::validators_count(), 4);
+        })
+    }
+    #[test]
+    fn remove_validator_should_work() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_ok!(BridgeModule::remove_validator(Origin::signed(V2), V3));
+            let id = BridgeModule::message_id_by_transfer_id(0);
+            let mut message = BridgeModule::validator_history(id);
+            assert_eq!(message.status, Status::Pending);
+
+            assert_ok!(BridgeModule::remove_validator(Origin::signed(V1), V3));
+            message = BridgeModule::validator_history(id);
+            assert_eq!(message.status, Status::Revoked);
+            assert_eq!(BridgeModule::validators_count(), 2);
+        })
+    }
+    #[test]
+    fn remove_last_validator_should_fail() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_ok!(BridgeModule::remove_validator(Origin::signed(V2), V3));
+            assert_ok!(BridgeModule::remove_validator(Origin::signed(V1), V3));
+            assert_eq!(BridgeModule::validators_count(), 2);
+
+            //TODO: deal with two validators corner case
+            assert_ok!(BridgeModule::remove_validator(Origin::signed(V1), V2));
+            assert_ok!(BridgeModule::remove_validator(Origin::signed(V2), V2));
+            // ^ this guy probably will not sign his removal ^
+
+            assert_eq!(BridgeModule::validators_count(), 1);
+            // TODO: fails through different hashes
+            // assert_ok fails with corect error but the noop below fails with different hashes
+            // assert_noop!(BridgeModule::remove_validator(Origin::signed(V1), V1), "Cant remove last validator");
         })
     }
 }

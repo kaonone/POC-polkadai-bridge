@@ -199,8 +199,8 @@ fn testnet_genesis(
 			current_schedule: Schedule::default(), // Current cost schedule for contracts.
 		}),
 		bridge: Some(BridgeConfig {
-			validators_count: 3usize, //default
 			validator_accounts: bridge_validators,
+			validators_count: 3u32,
 		}),
 	}
 }
@@ -337,8 +337,8 @@ fn akropolis_staging_genesis() -> GenesisConfig {
 			current_schedule: Schedule::default(), // Current cost schedule for contracts.
 		}),
 		bridge: Some(BridgeConfig {
-			validators_count: 3usize, //default
 			validator_accounts: bridge_validators,
+			validators_count: 3u32, 
 		})
 	}
 }
