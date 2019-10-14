@@ -866,6 +866,16 @@ mod tests {
         })
     }
     #[test]
+    fn double_pause_should_fail() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_eq!(BridgeModule::bridge_is_operational(), true);
+            assert_ok!(BridgeModule::pause_bridge(Origin::signed(V2)));
+            assert_ok!(BridgeModule::pause_bridge(Origin::signed(V1)));
+            assert_eq!(BridgeModule::bridge_is_operational(), false);
+            assert_noop!(BridgeModule::pause_bridge(Origin::signed(V1)), "Bridge is not operational already");
+        })
+    }
+    #[test]
     fn pause_and_resume_the_bridge_should_work() {
         with_externalities(&mut new_test_ext(), || {
             assert_eq!(BridgeModule::bridge_is_operational(), true);
