@@ -173,6 +173,7 @@ decl_module! {
             let validator = ensure_signed(origin)?;
             Self::check_validator(validator.clone())?;
 
+            ensure!(Self::bridge_is_operational(), "Bridge is not operational already");
             let hash = ("pause", T::BlockNumber::sa(0)).using_encoded(<T as system::Trait>::Hashing::hash);
 
             if !<BridgeMessages<T>>::exists(hash) {
@@ -194,7 +195,6 @@ decl_module! {
         fn resume_bridge(origin) -> Result {
             let validator = ensure_signed(origin)?;
             Self::check_validator(validator.clone())?;
-
 
             let hash = ("resume", T::BlockNumber::sa(0)).using_encoded(<T as system::Trait>::Hashing::hash);
 
