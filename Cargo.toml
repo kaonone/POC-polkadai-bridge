@@ -3,7 +3,7 @@ authors = ['Akropolis <admin@akropolis.io>']
 build = 'build.rs'
 edition = '2018'
 name = 'erc20-substrate-bridge'
-version = '1.0.0'
+version = '0.0.2'
 
 [dependencies]
 error-chain = '0.12'
