@@ -15,6 +15,8 @@ use support::{
 };
 use system::{self, ensure_signed};
 
+const MAX_VALIDATORS: u32 = 100_000;
+
 decl_event!(
     pub enum Event<T>
     where
@@ -39,7 +41,7 @@ decl_storage! {
 
         BridgeTransfers get(transfers): map ProposalId => BridgeTransfer<T::Hash>;
         BridgeTransfersCount get(bridge_transfers_count): ProposalId;
-        Messages get(messages): map(T::Hash) => TransferMessage<T::AccountId, T::Hash>;
+        TransferMessages get(messages): map(T::Hash) => TransferMessage<T::AccountId, T::Hash>;
         TransferId get(transfer_id_by_hash): map(T::Hash) => ProposalId;
         MessageId get(message_id_by_transfer_id): map(ProposalId) => T::Hash;
 
@@ -79,7 +81,7 @@ decl_module! {
             Self::get_transfer_id_checked(transfer_hash, Kind::Transfer)?;
             Self::deposit_event(RawEvent::RelayMessage(transfer_hash));
 
-            <Messages<T>>::insert(transfer_hash, message);
+            <TransferMessages<T>>::insert(transfer_hash, message);
             Ok(())
         }
 
@@ -90,7 +92,7 @@ decl_module! {
 
             Self::check_validator(validator.clone())?;
 
-            if !<Messages<T>>::exists(message_id) {
+            if !<TransferMessages<T>>::exists(message_id) {
                 let message = TransferMessage{
                     message_id,
                     eth_address: from,
@@ -99,7 +101,7 @@ decl_module! {
                     status: Status::Deposit,
                     action: Status::Deposit,
                 };
-                <Messages<T>>::insert(message_id, message);
+                <TransferMessages<T>>::insert(message_id, message);
                 Self::get_transfer_id_checked(message_id, Kind::Transfer)?;
             }
 
@@ -172,6 +174,7 @@ decl_module! {
             let validator = ensure_signed(origin)?;
             Self::check_validator(validator.clone())?;
 
+            ensure!(Self::bridge_is_operational(), "Bridge is not operational already");
             let hash = ("pause", T::BlockNumber::sa(0)).using_encoded(<T as system::Trait>::Hashing::hash);
 
             if !<BridgeMessages<T>>::exists(hash) {
@@ -193,7 +196,6 @@ decl_module! {
         fn resume_bridge(origin) -> Result {
             let validator = ensure_signed(origin)?;
             Self::check_validator(validator.clone())?;
-
 
             let hash = ("resume", T::BlockNumber::sa(0)).using_encoded(<T as system::Trait>::Hashing::hash);
 
@@ -220,8 +222,8 @@ decl_module! {
 
             let id = <TransferId<T>>::get(message_id);
 
-            let is_approved = <Messages<T>>::get(message_id).status == Status::Approved ||
-            <Messages<T>>::get(message_id).status == Status::Confirmed;
+            let is_approved = <TransferMessages<T>>::get(message_id).status == Status::Approved ||
+            <TransferMessages<T>>::get(message_id).status == Status::Confirmed;
             ensure!(is_approved, "This transfer must be approved first.");
 
             Self::update_status(message_id, Status::Confirmed, Kind::Transfer)?;
@@ -237,11 +239,11 @@ decl_module! {
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
             Self::check_validator(validator)?;
 
-            let mut message = <Messages<T>>::get(message_id);
+            let mut message = <TransferMessages<T>>::get(message_id);
             message.status = Status::Canceled;
 
             <token::Module<T>>::unlock(&message.substrate_address, message.amount)?;
-            <Messages<T>>::insert(message_id, message);
+            <TransferMessages<T>>::insert(message_id, message);
 
             Ok(())
         }
@@ -252,7 +254,7 @@ impl<T: Trait> Module<T> {
     fn _sign(validator: T::AccountId, transfer_id: ProposalId) -> Result {
         let mut transfer = <BridgeTransfers<T>>::get(transfer_id);
 
-        let mut message = <Messages<T>>::get(transfer.message_id);
+        let mut message = <TransferMessages<T>>::get(transfer.message_id);
         let mut validator_message = <ValidatorHistory<T>>::get(transfer.message_id);
         let mut bridge_message = <BridgeMessages<T>>::get(transfer.message_id);
         let voted = <ValidatorVotes<T>>::get((transfer_id, validator.clone()));
@@ -313,7 +315,7 @@ impl<T: Trait> Module<T> {
 
     /// add validator
     fn _add_validator(info: ValidatorMessage<T::AccountId, T::Hash>) -> Result {
-        
+        ensure!(<ValidatorsCount<T>>::get() < MAX_VALIDATORS, "Validators maximum reached.");
         <Validators<T>>::insert(info.account.clone(), true);
         <ValidatorAccounts<T>>::mutate(|v| v.retain(|x| *x != info.account));
         <ValidatorsCount<T>>::mutate(|x| *x += 1);
@@ -322,6 +324,7 @@ impl<T: Trait> Module<T> {
 
     /// remove validator
     fn _remove_validator(info: ValidatorMessage<T::AccountId, T::Hash>) -> Result {
+        ensure!(<ValidatorsCount<T>>::get() > 1, "Can not remove last validator.");
         <Validators<T>>::remove(info.account);
         <ValidatorsCount<T>>::mutate(|x| *x -= 1);
         <ValidatorHistory<T>>::remove(info.message_id);
@@ -341,7 +344,7 @@ impl<T: Trait> Module<T> {
     }
 
     fn execute_burn(message_id: T::Hash) -> Result {
-        let message = <Messages<T>>::get(message_id);
+        let message = <TransferMessages<T>>::get(message_id);
         let from = message.substrate_address.clone();
         let to = message.eth_address;
 
@@ -441,9 +444,9 @@ impl<T: Trait> Module<T> {
     fn update_status(id: T::Hash, status: Status, kind: Kind) -> Result {
         match kind {
             Kind::Transfer => {
-                let mut message = <Messages<T>>::get(id);
+                let mut message = <TransferMessages<T>>::get(id);
                 message.status = status;
-                <Messages<T>>::insert(id, message);
+                <TransferMessages<T>>::insert(id, message);
             }
             Kind::Validator => {
                 let mut message = <ValidatorHistory<T>>::get(id);
@@ -461,7 +464,7 @@ impl<T: Trait> Module<T> {
 
     // needed because @message_id will be the same as initial
     fn reopen_for_burn_confirmation(message_id: T::Hash) -> Result {
-        let message = <Messages<T>>::get(message_id);
+        let message = <TransferMessages<T>>::get(message_id);
         let transfer_id = <TransferId<T>>::get(message_id);
         let mut transfer = <BridgeTransfers<T>>::get(transfer_id);
         if !transfer.open && message.status == Status::Confirmed {
@@ -872,6 +875,16 @@ mod tests {
                 ),
                 "Bridge is not operational"
             );
+        })
+    }
+    #[test]
+    fn double_pause_should_fail() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_eq!(BridgeModule::bridge_is_operational(), true);
+            assert_ok!(BridgeModule::pause_bridge(Origin::signed(V2)));
+            assert_ok!(BridgeModule::pause_bridge(Origin::signed(V1)));
+            assert_eq!(BridgeModule::bridge_is_operational(), false);
+            assert_noop!(BridgeModule::pause_bridge(Origin::signed(V1)), "Bridge is not operational already");
         })
     }
     #[test]
