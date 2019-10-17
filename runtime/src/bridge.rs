@@ -15,6 +15,8 @@ use support::{
 };
 use system::{self, ensure_signed};
 
+const MAX_VALIDATORS: u32 = 100_000;
+
 decl_event!(
     pub enum Event<T>
     where
@@ -311,6 +313,7 @@ impl<T: Trait> Module<T> {
 
     /// add validator
     fn _add_validator(info: ValidatorMessage<T::AccountId, T::Hash>) -> Result {
+        ensure!(<ValidatorsCount<T>>::get() < MAX_VALIDATORS, "Validators maximum reached.");
         <Validators<T>>::insert(info.account, true);
         <ValidatorsCount<T>>::mutate(|x| *x += 1);
         Self::update_status(info.message_id, Status::Confirmed, Kind::Validator)
@@ -318,6 +321,7 @@ impl<T: Trait> Module<T> {
 
     /// remove validator
     fn _remove_validator(info: ValidatorMessage<T::AccountId, T::Hash>) -> Result {
+        ensure!(<ValidatorsCount<T>>::get() > 1, "Can not remove last validator.");
         <Validators<T>>::remove(info.account);
         <ValidatorsCount<T>>::mutate(|x| *x -= 1);
         <ValidatorHistory<T>>::remove(info.message_id);
