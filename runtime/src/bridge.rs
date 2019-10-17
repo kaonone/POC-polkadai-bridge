@@ -45,15 +45,13 @@ decl_storage! {
 
 
         ValidatorsCount get(validators_count) config(): u32 = 3;
-        ValidatorVotes get(validator_votes): map(ProposalId) => Vec<T::AccountId>;
+        ValidatorVotes get(validator_votes): map(ProposalId, T::AccountId) => bool;
         ValidatorHistory get(validator_history): map (T::Hash) => ValidatorMessage<T::AccountId, T::Hash>;
         Validators get(validators) build(|config: &GenesisConfig<T>| {
             config.validator_accounts.clone().into_iter()
             .map(|acc: T::AccountId| (acc, true)).collect::<Vec<_>>()
         }): map (T::AccountId) => bool;
-    }
-    add_extra_genesis {
-        config(validator_accounts): Vec<T::AccountId>;
+        ValidatorAccounts get(validator_accounts) config(): Vec<T::AccountId>
     }
 }
 
@@ -251,14 +249,14 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    fn _sign(validator: T::AccountId,transfer_id: ProposalId) -> Result {
+    fn _sign(validator: T::AccountId, transfer_id: ProposalId) -> Result {
         let mut transfer = <BridgeTransfers<T>>::get(transfer_id);
 
         let mut message = <Messages<T>>::get(transfer.message_id);
         let mut validator_message = <ValidatorHistory<T>>::get(transfer.message_id);
         let mut bridge_message = <BridgeMessages<T>>::get(transfer.message_id);
-        let voted_list = <ValidatorVotes<T>>::get(transfer_id);
-        ensure!(!voted_list.iter().any(|x| *x == validator), "This validator has already voted.");
+        let voted = <ValidatorVotes<T>>::get((transfer_id, validator.clone()));
+        ensure!(!voted, "This validator has already voted.");
         ensure!(transfer.open, "This transfer is not open");
         transfer.votes += 1;
 
@@ -288,7 +286,7 @@ impl<T: Trait> Module<T> {
             };
         }
 
-        <ValidatorVotes<T>>::mutate(transfer_id, |a| a.push(validator));
+        <ValidatorVotes<T>>::mutate((transfer_id, validator), |a| *a = true);
         <BridgeTransfers<T>>::insert(transfer_id, transfer);
 
         Ok(())
@@ -315,7 +313,9 @@ impl<T: Trait> Module<T> {
 
     /// add validator
     fn _add_validator(info: ValidatorMessage<T::AccountId, T::Hash>) -> Result {
-        <Validators<T>>::insert(info.account, true);
+        
+        <Validators<T>>::insert(info.account.clone(), true);
+        <ValidatorAccounts<T>>::mutate(|v| v.retain(|x| *x != info.account));
         <ValidatorsCount<T>>::mutate(|x| *x += 1);
         Self::update_status(info.message_id, Status::Confirmed, Kind::Validator)
     }
@@ -421,7 +421,6 @@ impl<T: Trait> Module<T> {
         let bridge_transfers_count = <BridgeTransfersCount<T>>::get();
         let new_bridge_transfers_count = bridge_transfers_count
             .checked_add(1)
-
             .ok_or("Overflow adding a new bridge transfer")?;
         let transfer = BridgeTransfer {
             transfer_id,
@@ -469,7 +468,10 @@ impl<T: Trait> Module<T> {
             transfer.votes = 0;
             transfer.open = true;
             <BridgeTransfers<T>>::insert(transfer_id, transfer);
-            <ValidatorVotes<T>>::mutate(transfer_id, |a| a.clear());
+            let validators = <ValidatorAccounts<T>>::get();
+            validators
+                .iter()
+                .for_each(|a| <ValidatorVotes<T>>::insert((transfer_id, a.clone()), false));
         }
         Ok(())
     }
@@ -890,7 +892,10 @@ mod tests {
         with_externalities(&mut new_test_ext(), || {
             assert_eq!(BridgeModule::bridge_is_operational(), true);
             assert_ok!(BridgeModule::pause_bridge(Origin::signed(V2)));
-            assert_noop!(BridgeModule::pause_bridge(Origin::signed(V2)), "This validator has already voted.");
+            assert_noop!(
+                BridgeModule::pause_bridge(Origin::signed(V2)),
+                "This validator has already voted."
+            );
         })
     }
 }
