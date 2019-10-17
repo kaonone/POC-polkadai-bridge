@@ -1,0 +1,22 @@
+type Message @entity {
+  id: ID!
+  ethAddress: String!
+  subAddress: String!
+  amount: BigInt!
+  status: Status!
+  direction: Direction!
+  ethBlockNumber: BigInt
+}
+
+enum Status {
+  PENDING
+  WITHDRAW
+  APPROVED
+  CANCELED
+  CONFIRMED
+}
+
+enum Direction {
+  ETH2SUB
+  SUB2ETH
+}

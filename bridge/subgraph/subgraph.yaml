@@ -1,0 +1,32 @@
+specVersion: 0.0.2
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum/contract
+    name: Contract
+    network: kovan
+    source:
+      address: "0x9ff8c644f09b0b7dc030c8aad52dc1628a22c4c2"
+      abi: Contract
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.3
+      language: wasm/assemblyscript
+      entities:
+        - RelayMessage
+        - RevertMessage
+        - WithdrawMessage
+        - ApprovedRelayMessage
+      abis:
+        - name: Contract
+          file: ./abis/Contract.json
+      eventHandlers:
+        - event: RelayMessage(bytes32,address,bytes32,uint256)
+          handler: handleRelayMessage
+        - event: RevertMessage(bytes32,address,uint256)
+          handler: handleRevertMessage
+        - event: WithdrawMessage(bytes32,bytes32,address,uint256)
+          handler: handleWithdrawMessage
+        - event: ApprovedRelayMessage(bytes32,address,bytes32,uint256)
+          handler: handleApprovedRelayMessage
+      file: ./src/mapping.ts
