@@ -25,8 +25,8 @@ decl_event!(
     {
         RelayMessage(Hash),
         ApprovedRelayMessage(Hash, AccountId, H160, TokenBalance),
-        Minted(Hash),
-        Burned(Hash, AccountId, H160, TokenBalance),
+        MintedMessage(Hash),
+        BurnedMessage(Hash, AccountId, H160, TokenBalance),
     }
 );
 
@@ -348,7 +348,7 @@ impl<T: Trait> Module<T> {
         <token::Module<T>>::unlock(&from, message.amount)?;
         <token::Module<T>>::_burn(from.clone(), message.amount)?;
 
-        Self::deposit_event(RawEvent::Burned(message_id, from, to, message.amount));
+        Self::deposit_event(RawEvent::BurnedMessage(message_id, from, to, message.amount));
         Ok(())
     }
 
@@ -358,7 +358,7 @@ impl<T: Trait> Module<T> {
                 Status::Approved => {
                     let to = message.substrate_address.clone();
                     <token::Module<T>>::_mint(to, message.amount)?;
-                    Self::deposit_event(RawEvent::Minted(message.message_id));
+                    Self::deposit_event(RawEvent::MintedMessage(message.message_id));
                     Self::update_status(message.message_id, Status::Confirmed, Kind::Transfer)
                 }
                 _ => Err("Tried to deposit with non-supported status"),
@@ -733,7 +733,7 @@ mod tests {
                 sub_message_id
             ));
             // assert_ok!(BridgeModule::confirm_transfer(Origin::signed(USER1), sub_message_id));
-            //Burned(Hash, AccountId, H160, u64) event emitted
+            //BurnedMessage(Hash, AccountId, H160, u64) event emitted
 
             assert_eq!(TokenModule::balance_of(USER2), 500);
             assert_eq!(TokenModule::total_supply(), 500);
