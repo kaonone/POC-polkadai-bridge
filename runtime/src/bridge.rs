@@ -4,8 +4,8 @@
 ///
 use crate::token;
 use crate::types::{
-    BridgeMessage, BridgeTransfer, Kind, MemberId, ProposalId, Status, TokenBalance,
-    TransferMessage, ValidatorMessage, LimitMessage
+    BridgeMessage, BridgeTransfer, Kind, LimitMessage, MemberId, ProposalId, Status, TokenBalance,
+    TransferMessage, ValidatorMessage,
 };
 use parity_codec::Encode;
 use primitives::H160;
@@ -118,6 +118,7 @@ decl_module! {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
             Self::check_validator(validator)?;
+            Self::check_limit(amount)?;
 
             if !<LimitMessages<T>>::exists(message_id) {
                 let message = LimitMessage{
@@ -139,6 +140,7 @@ decl_module! {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
             Self::check_validator(validator)?;
+            Self::check_limit(amount)?;
 
             if !<LimitMessages<T>>::exists(message_id) {
                 let message = LimitMessage{
@@ -362,11 +364,13 @@ impl<T: Trait> Module<T> {
     }
 
     fn _change_max_limit(message: LimitMessage<T::Hash>) -> Result {
+        Self::check_limit(message.amount)?;
         <MaxLimit<T>>::put(message.amount);
         Self::update_status(message.message_id, Status::Confirmed, Kind::Limits)
     }
 
     fn _change_min_limit(message: LimitMessage<T::Hash>) -> Result {
+        Self::check_limit(message.amount)?;
         <MinLimit<T>>::put(message.amount);
         Self::update_status(message.message_id, Status::Confirmed, Kind::Limits)
     }
@@ -534,7 +538,7 @@ impl<T: Trait> Module<T> {
                 let mut message = <LimitMessages<T>>::get(id);
                 message.status = status;
                 <LimitMessages<T>>::insert(id, message);
-        }
+            }
         }
         Ok(())
     }
@@ -566,8 +570,17 @@ impl<T: Trait> Module<T> {
         let max = <MaxLimit<T>>::get() * 10u128.pow(token.decimals.into());
         let min = <MinLimit<T>>::get() * 10u128.pow(token.decimals.into());
 
-        ensure!(amount >= min, "Invalid amount for transaction. Reached minimum limit.");
-        ensure!(amount <= max, "Invalid amount for transaction. Reached maximum limit.");
+        ensure!(amount > min, "Invalid amount for transaction. Reached minimum limit.");
+        ensure!(amount < max, "Invalid amount for transaction. Reached maximum limit.");
+
+        Ok(())
+    }
+
+    fn check_limit(amount: TokenBalance) -> Result {
+        let max = u128::max_value();
+        let min = u128::min_value();
+        ensure!(amount < max, "Overflow setting limit");
+        ensure!(amount > min, "Underflow setting limit");
 
         Ok(())
     }
@@ -688,7 +701,7 @@ mod tests {
         with_externalities(&mut new_test_ext(), || {
             let message_id = H256::from(ETH_MESSAGE_ID);
             let eth_address = H160::from(ETH_ADDRESS);
-            let amount = 999 * 10u128.pow(18u32);
+            let amount = 999 * 10u128.pow(18);
 
             //substrate <----- ETH
             assert_ok!(BridgeModule::multi_signed_mint(
@@ -723,7 +736,7 @@ mod tests {
         with_externalities(&mut new_test_ext(), || {
             let message_id = H256::from(ETH_MESSAGE_ID);
             let eth_address = H160::from(ETH_ADDRESS);
-            let amount = 999 * 10u128.pow(18u32);
+            let amount = 999 * 10u128.pow(18);
 
             //substrate <----- ETH
             assert_ok!(BridgeModule::multi_signed_mint(
@@ -765,8 +778,8 @@ mod tests {
         with_externalities(&mut new_test_ext(), || {
             let eth_message_id = H256::from(ETH_MESSAGE_ID);
             let eth_address = H160::from(ETH_ADDRESS);
-            let amount1 = 999 * 10u128.pow(18u32);
-            let amount2 = 500 * 10u128.pow(18u32);
+            let amount1 = 999 * 10u128.pow(18);
+            let amount2 = 500 * 10u128.pow(18);
 
             //substrate <----- ETH
             assert_ok!(BridgeModule::multi_signed_mint(
@@ -844,9 +857,8 @@ mod tests {
         with_externalities(&mut new_test_ext(), || {
             let eth_message_id = H256::from(ETH_MESSAGE_ID);
             let eth_address = H160::from(ETH_ADDRESS);
-            let amount1 = 999 * 10u128.pow(18u32);
-            let amount2 = 500 * 10u128.pow(18u32);
-            
+            let amount1 = 999 * 10u128.pow(18);
+            let amount2 = 500 * 10u128.pow(18);
             //substrate <----- ETH
             assert_ok!(BridgeModule::multi_signed_mint(
                 Origin::signed(V2),
@@ -978,7 +990,10 @@ mod tests {
             assert_ok!(BridgeModule::pause_bridge(Origin::signed(V2)));
             assert_ok!(BridgeModule::pause_bridge(Origin::signed(V1)));
             assert_eq!(BridgeModule::bridge_is_operational(), false);
-            assert_noop!(BridgeModule::pause_bridge(Origin::signed(V1)), "Bridge is not operational already");
+            assert_noop!(
+                BridgeModule::pause_bridge(Origin::signed(V1)),
+                "Bridge is not operational already"
+            );
         })
     }
     #[test]
@@ -1010,8 +1025,16 @@ mod tests {
             let message_id = H256::from(ETH_MESSAGE_ID);
 
             assert_eq!(BridgeModule::min_tx_limit(), 10);
-            assert_ok!(BridgeModule::change_min_limit(Origin::signed(V2), message_id, LESS_THAN_MINIMUM));
-            assert_ok!(BridgeModule::change_min_limit(Origin::signed(V1), message_id, LESS_THAN_MINIMUM));
+            assert_ok!(BridgeModule::change_min_limit(
+                Origin::signed(V2),
+                message_id,
+                LESS_THAN_MINIMUM
+            ));
+            assert_ok!(BridgeModule::change_min_limit(
+                Origin::signed(V1),
+                message_id,
+                LESS_THAN_MINIMUM
+            ));
             assert_eq!(BridgeModule::min_tx_limit(), LESS_THAN_MINIMUM);
         })
     }
@@ -1022,9 +1045,43 @@ mod tests {
             let message_id = H256::from(ETH_MESSAGE_ID);
 
             assert_eq!(BridgeModule::max_tx_limit(), 1000);
-            assert_ok!(BridgeModule::change_max_limit(Origin::signed(V2), message_id, MORE_THAN_MAX));
-            assert_ok!(BridgeModule::change_max_limit(Origin::signed(V1), message_id, MORE_THAN_MAX));
+            assert_ok!(BridgeModule::change_max_limit(
+                Origin::signed(V2),
+                message_id,
+                MORE_THAN_MAX
+            ));
+            assert_ok!(BridgeModule::change_max_limit(
+                Origin::signed(V1),
+                message_id,
+                MORE_THAN_MAX
+            ));
             assert_eq!(BridgeModule::max_tx_limit(), MORE_THAN_MAX);
+        })
+    }
+    #[test]
+    fn change_min_limit_should_fail() {
+        with_externalities(&mut new_test_ext(), || {
+            const LESS_THAN_MINIMUM: u128 = u128::min_value();
+            let message_id = H256::from(ETH_MESSAGE_ID);
+
+            assert_eq!(BridgeModule::min_tx_limit(), 10);
+            assert_noop!(
+                BridgeModule::change_min_limit(Origin::signed(V2), message_id, LESS_THAN_MINIMUM),
+                "Underflow setting limit"
+            );
+        })
+    }
+    #[test]
+    fn change_max_limit_should_fail() {
+        with_externalities(&mut new_test_ext(), || {
+            const MORE_THAN_MAX: u128 = u128::max_value();
+            let message_id = H256::from(ETH_MESSAGE_ID);
+
+            assert_eq!(BridgeModule::max_tx_limit(), 1000);
+            assert_noop!(
+                BridgeModule::change_max_limit(Origin::signed(V2), message_id, MORE_THAN_MAX),
+                "Overflow setting limit"
+            );
         })
     }
 }
