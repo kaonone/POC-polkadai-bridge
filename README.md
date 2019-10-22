@@ -128,19 +128,32 @@ This guide will walk you through how to create an account and how to connect to 
 ```bash
 
 {
-  "Count": "u64",
   "MemberId": "u64",
   "ProposalId": "u64",
-  "TokenBalance": "u64",
+  "TokenBalance": "u128",
   "TokenId": "u32",
   "Token": {
     "token_id": "u32",
     "decimals": "u16",
     "symbol": "Vec<u8>"
   },
+  "BridgeTransfer": {
+    "transfer_id": "ProposalId",
+    "message_id": "H256",
+    "open": "bool",
+    "votes": "MemberId"
+    "kind": "Kind"
+  },
   "Status": {
       "_enum":[
+        "Revoked",
         "Pending",
+        "PauseTheBridge",
+        "ResumeTheBridge",
+        "AddValidator",
+        "RemoveValidator",
+        "ChangeMinTx",
+        "ChangeMaxTx",
         "Deposit",
         "Withdraw",
         "Approved",
@@ -148,7 +161,14 @@ This guide will walk you through how to create an account and how to connect to 
         "Confirmed"
       ]
   },
-    "Message": {
+  "Kind" :{
+    "_enum":[
+    "Transfer",
+    "Limits",
+    "Validator",
+    "Bridge",
+  },
+    "TransferMessage": {
       "message_id": "H256",
       "eth_address": "H160",
       "substrate_address": "AccountId",
@@ -156,12 +176,24 @@ This guide will walk you through how to create an account and how to connect to 
       "status": "Status",
       "direction": "Status"
   },
-  "BridgeTransfer": {
-    "transfer_id": "ProposalId",
-    "message_id": "H256",
-    "open": "bool",
-    "votes": "MemberId"
-  }
+    "ValidatorMessage": {
+      "message_id": "H256",
+      "account": "AccountId",
+      "status": "Status",
+      "action": "Status"
+  },
+    "LimitMessage": {
+      "message_id": "H256",
+      "amount": "TokenBalance",
+      "status": "Status",
+      "action": "Status"
+  },
+    "BridgeMessage": {
+      "message_id": "H256",
+      "account": "AccountId",
+      "status": "Status",
+      "action": "Status"
+  },
 }
 
 ```
