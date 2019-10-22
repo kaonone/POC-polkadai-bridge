@@ -6,9 +6,16 @@ pub type MemberId = u64;
 pub type ProposalId = u64;
 
 // token factory types
-pub type TokenBalance = u64;
+pub type TokenBalance = u128;
 pub type TokenId = u32;
 
+#[derive(Encode, Decode, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub struct Token {
+    pub id: TokenId,
+    pub decimals: u16,
+    pub symbol: Vec<u8>,
+}
 
 // bridge types
 #[derive(Encode, Decode, Clone)]
@@ -30,6 +37,8 @@ pub enum Status {
     ResumeTheBridge,
     AddValidator,
     RemoveValidator,
+    ChangeMinTx,
+    ChangeMaxTx,
     Deposit,
     Withdraw,
     Approved,
@@ -41,6 +50,7 @@ pub enum Status {
 #[cfg_attr(feature = "std", derive(Debug))]
 pub enum Kind {
     Transfer,
+    Limits,
     Validator,
     Bridge,
 }
@@ -61,6 +71,15 @@ pub struct TransferMessage<AccountId, Hash> {
 pub struct ValidatorMessage<AccountId, Hash> {
     pub message_id: Hash,
     pub account: AccountId,
+    pub action: Status,
+    pub status: Status,
+}
+
+#[derive(Encode, Decode, Clone)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub struct LimitMessage<Hash> {
+    pub message_id: Hash,
+    pub amount: TokenBalance,
     pub action: Status,
     pub status: Status,
 }
@@ -102,6 +121,20 @@ where
             account: A::default(),
             action: Status::Revoked,
             status: Status::Revoked,
+        }
+    }
+}
+
+impl<H> Default for LimitMessage<H>
+where
+    H: Default,
+{
+    fn default() -> Self {
+        LimitMessage {
+            message_id: H::default(),
+            amount: TokenBalance::default(),
+            status: Status::ChangeMinTx,
+            action: Status::ChangeMinTx,
         }
     }
 }
