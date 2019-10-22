@@ -5,7 +5,7 @@
 use crate::token;
 use crate::types::{
     BridgeMessage, BridgeTransfer, Kind, MemberId, ProposalId, Status, TokenBalance,
-    TransferMessage, ValidatorMessage,
+    TransferMessage, ValidatorMessage, LimitMessage
 };
 use parity_codec::Encode;
 use primitives::H160;
@@ -16,8 +16,6 @@ use support::{
 use system::{self, ensure_signed};
 
 const MAX_VALIDATORS: u32 = 100_000;
-const MAX_TX: TokenBalance = 1000;
-const MIN_TX: TokenBalance = 10;
 
 decl_event!(
     pub enum Event<T>
@@ -40,6 +38,10 @@ decl_storage! {
     trait Store for Module<T: Trait> as Bridge {
         BridgeIsOperational get(bridge_is_operational): bool = true;
         BridgeMessages get(bridge_messages): map (T::Hash) => BridgeMessage<T::AccountId, T::Hash>;
+
+        MaxLimit get(max_tx_limit): TokenBalance = 1000;
+        MinLimit get(min_tx_limit): TokenBalance = 10;
+        LimitMessages get(limit_messages): map(T::Hash) => LimitMessage<T::Hash>;
 
         BridgeTransfers get(transfers): map ProposalId => BridgeTransfer<T::Hash>;
         BridgeTransfersCount get(bridge_transfers_count): ProposalId;
@@ -110,9 +112,49 @@ decl_module! {
             }
 
             let transfer_id = <TransferId<T>>::get(message_id);
-            Self::_sign(transfer_id)?;
+            Self::_sign(transfer_id)
+        }
 
-            Ok(())
+        // change minimum tx limit
+        fn change_min_limit(origin, message_id: T::Hash, #[compact] amount: TokenBalance)-> Result {
+            let validator = ensure_signed(origin)?;
+            ensure!(Self::bridge_is_operational(), "Bridge is not operational");
+            Self::check_validator(validator)?;
+
+            if !<LimitMessages<T>>::exists(message_id) {
+                let message = LimitMessage{
+                    message_id,
+                    amount,
+                    action: Status::ChangeMinTx,
+                    status: Status::ChangeMinTx,
+                };
+                <LimitMessages<T>>::insert(message_id, message);
+                Self::get_transfer_id_checked(message_id, Kind::Limits)?;
+            }
+
+            let transfer_id = <TransferId<T>>::get(message_id);
+            Self::_sign(transfer_id)
+        }
+
+        // change maximum tx limit
+        fn change_max_limit(origin, message_id: T::Hash, #[compact] amount: TokenBalance)-> Result {
+            let validator = ensure_signed(origin)?;
+            ensure!(Self::bridge_is_operational(), "Bridge is not operational");
+            Self::check_validator(validator)?;
+
+            if !<LimitMessages<T>>::exists(message_id) {
+                let message = LimitMessage{
+                    message_id,
+                    amount,
+                    action: Status::ChangeMaxTx,
+                    status: Status::ChangeMaxTx,
+                };
+                <LimitMessages<T>>::insert(message_id, message);
+                Self::get_transfer_id_checked(message_id, Kind::Limits)?;
+            }
+
+            let transfer_id = <TransferId<T>>::get(message_id);
+            Self::_sign(transfer_id)
         }
 
         // validator`s response to RelayMessage
@@ -233,9 +275,7 @@ decl_module! {
 
             Self::update_status(message_id, Status::Confirmed, Kind::Transfer)?;
             Self::reopen_for_burn_confirmation(message_id)?;
-            Self::_sign(id)?;
-
-            Ok(())
+            Self::_sign(id)
         }
 
         //cancel burn from validator
@@ -260,6 +300,7 @@ impl<T: Trait> Module<T> {
         let mut transfer = <BridgeTransfers<T>>::get(transfer_id);
 
         let mut message = <TransferMessages<T>>::get(transfer.message_id);
+        let mut limit_message = <LimitMessages<T>>::get(transfer.message_id);
         let mut validator_message = <ValidatorHistory<T>>::get(transfer.message_id);
         let mut bridge_message = <BridgeMessages<T>>::get(transfer.message_id);
         ensure!(transfer.open, "This transfer is not open");
@@ -270,12 +311,14 @@ impl<T: Trait> Module<T> {
                 Status::Confirmed => (), // if burn is confirmed
                 _ => match transfer.kind {
                     Kind::Transfer => message.status = Status::Approved,
+                    Kind::Limits => limit_message.status = Status::Approved,
                     Kind::Validator => validator_message.status = Status::Approved,
                     Kind::Bridge => bridge_message.status = Status::Approved,
                 },
             }
             match transfer.kind {
                 Kind::Transfer => Self::execute_transfer(message)?,
+                Kind::Limits => Self::manage_limits(limit_message)?,
                 Kind::Validator => Self::manage_validator(validator_message)?,
                 Kind::Bridge => Self::manage_bridge(bridge_message)?,
             }
@@ -313,6 +356,16 @@ impl<T: Trait> Module<T> {
     fn resume_the_bridge(message: BridgeMessage<T::AccountId, T::Hash>) -> Result {
         <BridgeIsOperational<T>>::mutate(|x| *x = true);
         Self::update_status(message.message_id, Status::Confirmed, Kind::Bridge)
+    }
+
+    fn _change_max_limit(message: LimitMessage<T::Hash>) -> Result {
+        <MaxLimit<T>>::put(message.amount);
+        Self::update_status(message.message_id, Status::Confirmed, Kind::Limits)
+    }
+
+    fn _change_min_limit(message: LimitMessage<T::Hash>) -> Result {
+        <MinLimit<T>>::put(message.amount);
+        Self::update_status(message.message_id, Status::Confirmed, Kind::Limits)
     }
 
     /// add validator
@@ -415,6 +468,20 @@ impl<T: Trait> Module<T> {
         }
     }
 
+    fn manage_limits(message: LimitMessage<T::Hash>) -> Result {
+        match message.action {
+            Status::ChangeMinTx => match message.status {
+                Status::Approved => Self::_change_min_limit(message),
+                _ => Err("Tried to pause the bridge with non-supported status"),
+            },
+            Status::ChangeMaxTx => match message.status {
+                Status::Approved => Self::_change_max_limit(message),
+                _ => Err("Tried to resume the bridge with non-supported status"),
+            },
+            _ => Err("Tried to manage bridge with non-supported status"),
+        }
+    }
+
     fn create_transfer(transfer_hash: T::Hash, kind: Kind) -> Result {
         ensure!(
             !<TransferId<T>>::exists(transfer_hash),
@@ -460,9 +527,15 @@ impl<T: Trait> Module<T> {
                 message.status = status;
                 <BridgeMessages<T>>::insert(id, message);
             }
+            Kind::Limits => {
+                let mut message = <LimitMessages<T>>::get(id);
+                message.status = status;
+                <LimitMessages<T>>::insert(id, message);
+        }
         }
         Ok(())
     }
+
     fn reopen_for_burn_confirmation(message_id: T::Hash) -> Result {
         let message = <TransferMessages<T>>::get(message_id);
         let transfer_id = <TransferId<T>>::get(message_id);
@@ -482,11 +555,11 @@ impl<T: Trait> Module<T> {
     }
     fn check_amount(amount: TokenBalance) -> Result {
         let token = <token::Module<T>>::token_default();
-        let max = MAX_TX * 10u64.pow(token.decimals.into());
-        let min = MIN_TX * 10u64.pow(token.decimals.into());
+        let max = <MaxLimit<T>>::get() * 10u128.pow(token.decimals.into());
+        let min = <MinLimit<T>>::get() * 10u128.pow(token.decimals.into());
 
-        ensure!(amount < min, "Invalid amount for transaction. Reached minimum limit.");
-        ensure!(amount > max, "Invalid amount for transaction. Reached maximum limit.");
+        ensure!(amount >= min, "Invalid amount for transaction. Reached minimum limit.");
+        ensure!(amount <= max, "Invalid amount for transaction. Reached maximum limit.");
 
         Ok(())
     }
@@ -607,6 +680,7 @@ mod tests {
         with_externalities(&mut new_test_ext(), || {
             let message_id = H256::from(ETH_MESSAGE_ID);
             let eth_address = H160::from(ETH_ADDRESS);
+            let amount = 999 * 10u128.pow(18u32);
 
             //substrate <----- ETH
             assert_ok!(BridgeModule::multi_signed_mint(
@@ -614,7 +688,7 @@ mod tests {
                 message_id,
                 eth_address,
                 USER2,
-                1000
+                amount
             ));
             let mut message = BridgeModule::messages(message_id);
             assert_eq!(message.status, Status::Pending);
@@ -624,7 +698,7 @@ mod tests {
                 message_id,
                 eth_address,
                 USER2,
-                1000
+                amount
             ));
             message = BridgeModule::messages(message_id);
             assert_eq!(message.status, Status::Confirmed);
@@ -632,8 +706,8 @@ mod tests {
             let transfer = BridgeModule::transfers(0);
             assert_eq!(transfer.open, false);
 
-            assert_eq!(TokenModule::balance_of(USER2), 1000);
-            assert_eq!(TokenModule::total_supply(), 1000);
+            assert_eq!(TokenModule::balance_of(USER2), amount);
+            assert_eq!(TokenModule::total_supply(), amount);
         })
     }
     #[test]
@@ -641,6 +715,7 @@ mod tests {
         with_externalities(&mut new_test_ext(), || {
             let message_id = H256::from(ETH_MESSAGE_ID);
             let eth_address = H160::from(ETH_ADDRESS);
+            let amount = 999 * 10u128.pow(18u32);
 
             //substrate <----- ETH
             assert_ok!(BridgeModule::multi_signed_mint(
@@ -648,14 +723,14 @@ mod tests {
                 message_id,
                 eth_address,
                 USER2,
-                1000
+                amount
             ));
             assert_ok!(BridgeModule::multi_signed_mint(
                 Origin::signed(V1),
                 message_id,
                 eth_address,
                 USER2,
-                1000
+                amount
             ));
             assert_noop!(
                 BridgeModule::multi_signed_mint(
@@ -663,12 +738,12 @@ mod tests {
                     message_id,
                     eth_address,
                     USER2,
-                    1000
+                    amount
                 ),
                 "This transfer is not open"
             );
-            assert_eq!(TokenModule::balance_of(USER2), 1000);
-            assert_eq!(TokenModule::total_supply(), 1000);
+            assert_eq!(TokenModule::balance_of(USER2), amount);
+            assert_eq!(TokenModule::total_supply(), amount);
             let transfer = BridgeModule::transfers(0);
             assert_eq!(transfer.open, false);
 
@@ -682,6 +757,8 @@ mod tests {
         with_externalities(&mut new_test_ext(), || {
             let eth_message_id = H256::from(ETH_MESSAGE_ID);
             let eth_address = H160::from(ETH_ADDRESS);
+            let amount1 = 999 * 10u128.pow(18u32);
+            let amount2 = 500 * 10u128.pow(18u32);
 
             //substrate <----- ETH
             assert_ok!(BridgeModule::multi_signed_mint(
@@ -689,21 +766,21 @@ mod tests {
                 eth_message_id,
                 eth_address,
                 USER2,
-                1000
+                amount1
             ));
             assert_ok!(BridgeModule::multi_signed_mint(
                 Origin::signed(V1),
                 eth_message_id,
                 eth_address,
                 USER2,
-                1000
+                amount1
             ));
 
             //substrate ----> ETH
             assert_ok!(BridgeModule::set_transfer(
                 Origin::signed(USER2),
                 eth_address,
-                500
+                amount2
             ));
             //RelayMessage(message_id) event emitted
 
@@ -729,8 +806,8 @@ mod tests {
 
             // at this point transfer is in Approved status and are waiting for confirmation
             // from ethereum side to burn. Funds are locked.
-            assert_eq!(TokenModule::locked(USER2), 500);
-            assert_eq!(TokenModule::balance_of(USER2), 1000);
+            assert_eq!(TokenModule::locked(USER2), amount2);
+            assert_eq!(TokenModule::balance_of(USER2), amount1);
             // once it happends, validators call confirm_transfer
 
             assert_ok!(BridgeModule::confirm_transfer(
@@ -748,9 +825,10 @@ mod tests {
             ));
             // assert_ok!(BridgeModule::confirm_transfer(Origin::signed(USER1), sub_message_id));
             //BurnedMessage(Hash, AccountId, H160, u64) event emitted
-
-            assert_eq!(TokenModule::balance_of(USER2), 500);
-            assert_eq!(TokenModule::total_supply(), 500);
+            
+            let tokens_left = amount1 - amount2;
+            assert_eq!(TokenModule::balance_of(USER2), tokens_left);
+            assert_eq!(TokenModule::total_supply(), tokens_left);
         })
     }
     #[test]
@@ -758,30 +836,32 @@ mod tests {
         with_externalities(&mut new_test_ext(), || {
             let eth_message_id = H256::from(ETH_MESSAGE_ID);
             let eth_address = H160::from(ETH_ADDRESS);
-
+            let amount1 = 999 * 10u128.pow(18u32);
+            let amount2 = 500 * 10u128.pow(18u32);
+            
             //substrate <----- ETH
             assert_ok!(BridgeModule::multi_signed_mint(
                 Origin::signed(V2),
                 eth_message_id,
                 eth_address,
                 USER2,
-                1000
+                amount1
             ));
             assert_ok!(BridgeModule::multi_signed_mint(
                 Origin::signed(V1),
                 eth_message_id,
                 eth_address,
                 USER2,
-                1000
+                amount1
             ));
-            assert_eq!(TokenModule::balance_of(USER2), 1000);
-            assert_eq!(TokenModule::total_supply(), 1000);
+            assert_eq!(TokenModule::balance_of(USER2), amount1);
+            assert_eq!(TokenModule::total_supply(), amount1);
 
             //substrate ----> ETH
             assert_ok!(BridgeModule::set_transfer(
                 Origin::signed(USER2),
                 eth_address,
-                500
+                amount2
             ));
             //RelayMessage(message_id) event emitted
 
@@ -903,6 +983,30 @@ mod tests {
             assert_ok!(BridgeModule::resume_bridge(Origin::signed(V1)));
             assert_ok!(BridgeModule::resume_bridge(Origin::signed(V2)));
             assert_eq!(BridgeModule::bridge_is_operational(), true);
+        })
+    }
+    #[test]
+    fn change_min_limit_should_work() {
+        with_externalities(&mut new_test_ext(), || {
+            const LESS_THAN_MINIMUM: u128 = 5;
+            let message_id = H256::from(ETH_MESSAGE_ID);
+
+            assert_eq!(BridgeModule::min_tx_limit(), 10);
+            assert_ok!(BridgeModule::change_min_limit(Origin::signed(V2), message_id, LESS_THAN_MINIMUM));
+            assert_ok!(BridgeModule::change_min_limit(Origin::signed(V1), message_id, LESS_THAN_MINIMUM));
+            assert_eq!(BridgeModule::min_tx_limit(), LESS_THAN_MINIMUM);
+        })
+    }
+    #[test]
+    fn change_max_limit_should_work() {
+        with_externalities(&mut new_test_ext(), || {
+            const MORE_THAN_MAX: u128 = 10000;
+            let message_id = H256::from(ETH_MESSAGE_ID);
+
+            assert_eq!(BridgeModule::max_tx_limit(), 1000);
+            assert_ok!(BridgeModule::change_max_limit(Origin::signed(V2), message_id, MORE_THAN_MAX));
+            assert_ok!(BridgeModule::change_max_limit(Origin::signed(V1), message_id, MORE_THAN_MAX));
+            assert_eq!(BridgeModule::max_tx_limit(), MORE_THAN_MAX);
         })
     }
 }
