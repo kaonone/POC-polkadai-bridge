@@ -2,22 +2,12 @@
 /// You can use mint to create tokens or burn created tokens
 /// and transfer tokens on substrate side freely or operate with total_supply
 ///
-use crate::types::{TokenBalance, TokenId};
-use parity_codec::{Decode, Encode};
-use rstd::prelude::Vec;
+use crate::types::{TokenBalance, Token, TokenId};
 use runtime_primitives::traits::{StaticLookup, Zero};
 use support::{
     decl_event, decl_module, decl_storage, dispatch::Result, ensure, StorageMap, StorageValue,
 };
 use system::{self, ensure_signed};
-
-#[derive(Encode, Decode, Default, Clone, PartialEq)]
-#[cfg_attr(feature = "std", derive(Debug))]
-pub struct Token {
-    pub id: TokenId,
-    pub decimals: u16,
-    pub symbol: Vec<u8>,
-}
 
 decl_event!(
     pub enum Event<T>
