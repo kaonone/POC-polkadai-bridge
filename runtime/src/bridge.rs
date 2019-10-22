@@ -16,6 +16,8 @@ use support::{
 use system::{self, ensure_signed};
 
 const MAX_VALIDATORS: u32 = 100_000;
+const MAX_TX: TokenBalance = 1000;
+const MIN_TX: TokenBalance = 10;
 
 decl_event!(
     pub enum Event<T>
@@ -45,7 +47,6 @@ decl_storage! {
         TransferId get(transfer_id_by_hash): map(T::Hash) => ProposalId;
         MessageId get(message_id_by_transfer_id): map(ProposalId) => T::Hash;
 
-
         ValidatorsCount get(validators_count) config(): u32 = 3;
         ValidatorVotes get(validator_votes): map(ProposalId, T::AccountId) => bool;
         ValidatorHistory get(validator_history): map (T::Hash) => ValidatorMessage<T::AccountId, T::Hash>;
@@ -67,6 +68,7 @@ decl_module! {
         {
             let from = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
+            Self::check_amount(amount)?;
 
             let transfer_hash = (&from, &to, amount, T::BlockNumber::sa(0)).using_encoded(<T as system::Trait>::Hashing::hash);
 
@@ -91,6 +93,7 @@ decl_module! {
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
 
             Self::check_validator(validator.clone())?;
+            Self::check_amount(amount)?;
 
             if !<TransferMessages<T>>::exists(message_id) {
                 let message = TransferMessage{
@@ -144,6 +147,7 @@ decl_module! {
             let id = <TransferId<T>>::get(hash);
             Self::_sign(validator, id)
         }
+
         // each validator calls it to remove new validator
         fn remove_validator(origin, address: T::AccountId) -> Result {
             let validator = ensure_signed(origin)?;
@@ -481,6 +485,16 @@ impl<T: Trait> Module<T> {
     fn check_validator(validator: T::AccountId) -> Result {
         let is_trusted = <Validators<T>>::exists(validator);
         ensure!(is_trusted, "Only validators can call this function");
+
+        Ok(())
+    }
+    fn check_amount(amount: TokenBalance) -> Result {
+        let token = <token::Module<T>>::token_default();
+        let max = MAX_TX * 10u64.pow(token.decimals.into());
+        let min = MIN_TX * 10u64.pow(token.decimals.into());
+
+        ensure!(amount < min, "Invalid amount for transaction. Reached minimum limit.");
+        ensure!(amount > max, "Invalid amount for transaction. Reached maximum limit.");
 
         Ok(())
     }
