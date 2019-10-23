@@ -11,11 +11,12 @@ use parity_codec::Encode;
 use primitives::H160;
 use runtime_primitives::traits::{As, Hash};
 use support::{
-    decl_event, decl_module, decl_storage, dispatch::Result, ensure, StorageMap, StorageValue,
+    decl_event, decl_module, decl_storage, dispatch::Result, ensure, fail, StorageMap, StorageValue,
 };
 use system::{self, ensure_signed};
 
 const MAX_VALIDATORS: u32 = 100_000;
+const DAY: u64 = 14_400;
 
 decl_event!(
     pub enum Event<T>
@@ -48,6 +49,8 @@ decl_storage! {
         TransferMessages get(messages): map(T::Hash) => TransferMessage<T::AccountId, T::Hash>;
         TransferId get(transfer_id_by_hash): map(T::Hash) => ProposalId;
         MessageId get(message_id_by_transfer_id): map(ProposalId) => T::Hash;
+
+        DailyHolds get(daily_holds): map(T::AccountId) => (T::BlockNumber, T::Hash);
 
         ValidatorsCount get(validators_count) config(): u32 = 3;
         ValidatorHistory get(validator_history): map (T::Hash) => ValidatorMessage<T::AccountId, T::Hash>;
@@ -350,6 +353,33 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
+    fn deposit(message: TransferMessage<T::AccountId, T::Hash>) -> Result {
+        let to = message.substrate_address;
+
+        if !<DailyHolds<T>>::exists(&to) {
+            <DailyHolds<T>>::insert(to.clone(), (T::BlockNumber::sa(0), message.message_id));
+        }
+
+        <token::Module<T>>::_mint(to, message.amount)?;
+
+        Self::deposit_event(RawEvent::MintedMessage(message.message_id));
+        Self::update_status(message.message_id, Status::Confirmed, Kind::Transfer)
+    }
+
+    fn withdraw(message: TransferMessage<T::AccountId, T::Hash>) -> Result {
+        Self::check_daily_holds(message.clone())?;
+
+        let to = message.eth_address;
+        let from = message.substrate_address;
+        Self::lock_for_burn(from.clone(), message.amount)?;
+        Self::deposit_event(RawEvent::ApprovedRelayMessage(
+            message.message_id,
+            from,
+            to,
+            message.amount,
+        ));
+        Self::update_status(message.message_id, Status::Approved, Kind::Transfer)
+    }
     fn pause_the_bridge(message: BridgeMessage<T::AccountId, T::Hash>) -> Result {
         <BridgeIsOperational<T>>::mutate(|x| *x = false);
         Self::update_status(message.message_id, Status::Confirmed, Kind::Bridge)
@@ -416,28 +446,12 @@ impl<T: Trait> Module<T> {
     fn execute_transfer(message: TransferMessage<T::AccountId, T::Hash>) -> Result {
         match message.action {
             Status::Deposit => match message.status {
-                Status::Approved => {
-                    let to = message.substrate_address.clone();
-                    <token::Module<T>>::_mint(to, message.amount)?;
-                    Self::deposit_event(RawEvent::MintedMessage(message.message_id));
-                    Self::update_status(message.message_id, Status::Confirmed, Kind::Transfer)
-                }
+                Status::Approved => Self::deposit(message),
                 _ => Err("Tried to deposit with non-supported status"),
             },
             Status::Withdraw => match message.status {
                 Status::Confirmed => Self::execute_burn(message.message_id),
-                Status::Approved => {
-                    let to = message.eth_address;
-                    let from = message.substrate_address.clone();
-                    Self::lock_for_burn(from.clone(), message.amount)?;
-                    Self::deposit_event(RawEvent::ApprovedRelayMessage(
-                        message.message_id,
-                        from,
-                        to,
-                        message.amount,
-                    ));
-                    Self::update_status(message.message_id, Status::Approved, Kind::Transfer)
-                }
+                Status::Approved => Self::withdraw(message),
                 _ => Err("Tried to withdraw with non-supported status"),
             },
             _ => Err("Tried to execute transfer with non-supported status"),
@@ -573,6 +587,31 @@ impl<T: Trait> Module<T> {
         let min = u128::min_value();
         ensure!(amount < max, "Overflow setting limit");
         ensure!(amount > min, "Underflow setting limit");
+
+        Ok(())
+    }
+
+    fn check_daily_holds(message: TransferMessage<T::AccountId, T::Hash>) -> Result {
+        let from = message.substrate_address;
+        let first_tx = <DailyHolds<T>>::get(from.clone());
+        let deposit_message = <TransferMessages<T>>::get(first_tx.1);
+        let daily_hold = T::BlockNumber::sa(DAY);
+        let day_passed = first_tx.0 + daily_hold < T::BlockNumber::sa(0);
+
+        if !day_passed {
+            // 75% of potentially really big numbers
+            let allowed_amount = deposit_message
+                .amount
+                .checked_div(100)
+                .expect("Failed to calculate allowed withdraw amount")
+                .checked_mul(75)
+                .expect("Failed to calculate allowed withdraw amount");
+
+            if message.amount > allowed_amount {
+                Self::update_status(message.message_id, Status::Canceled, Kind::Transfer)?;
+                fail!("Cannot withdraw more that 75% of first day deposit.");
+}
+}
 
         Ok(())
     }
@@ -931,8 +970,8 @@ mod tests {
             // ^ this guy probably will not sign his removal ^
 
             assert_eq!(BridgeModule::validators_count(), 1);
-            // TODO: fails through different hashes
-            // assert_ok fails with corect error but the noop below fails with different hashes
+            // assert_noop BUG: fails through different root hashes
+            // assert_ok fails with corect error but the noop below fails with different root hashes
             // assert_noop!(BridgeModule::remove_validator(Origin::signed(V1), V1), "Cant remove last validator");
         })
     }
@@ -1064,6 +1103,64 @@ mod tests {
                 BridgeModule::change_max_limit(Origin::signed(V2), message_id, MORE_THAN_MAX),
                 "Overflow setting limit"
             );
+        })
+    }
+    #[test]
+    fn instant_withdraw_should_fail() {
+        with_externalities(&mut new_test_ext(), || {
+            let eth_message_id = H256::from(ETH_MESSAGE_ID);
+            let eth_address = H160::from(ETH_ADDRESS);
+            let amount1 = 999 * 10u128.pow(18);
+            let amount2 = 900 * 10u128.pow(18);
+
+            //substrate <----- ETH
+            assert_ok!(BridgeModule::multi_signed_mint(
+                Origin::signed(V2),
+                eth_message_id,
+                eth_address,
+                USER2,
+                amount1
+            ));
+            assert_ok!(BridgeModule::multi_signed_mint(
+                Origin::signed(V1),
+                eth_message_id,
+                eth_address,
+                USER2,
+                amount1
+            ));
+
+            //substrate ----> ETH
+            assert_ok!(BridgeModule::set_transfer(
+                Origin::signed(USER2),
+                eth_address,
+                amount2
+            ));
+            //RelayMessage(message_id) event emitted
+
+            let sub_message_id = BridgeModule::message_id_by_transfer_id(1);
+            let get_message = || BridgeModule::messages(sub_message_id);
+
+            let mut message = get_message();
+            assert_eq!(message.status, Status::Withdraw);
+
+            //approval
+            assert_eq!(TokenModule::locked(USER2), 0);
+            assert_ok!(BridgeModule::approve_transfer(
+                Origin::signed(V1),
+                sub_message_id
+            ));
+
+            // assert_noop BUG: fails through different root hashes
+            // assert_noop!(
+            //     BridgeModule::approve_transfer(Origin::signed(V2), sub_message_id),
+            //     "Cannot withdraw more that 75% of first day deposit."
+            // );
+            
+            // signs the transfer, but fails further and marks message as Canceled
+            let _ = BridgeModule::approve_transfer(Origin::signed(V2), sub_message_id);
+
+            message = get_message();
+            assert_eq!(message.status, Status::Canceled);
         })
     }
 }
