@@ -594,14 +594,13 @@ impl<T: Trait> Module<T> {
     fn check_daily_holds(message: TransferMessage<T::AccountId, T::Hash>) -> Result {
         let from = message.substrate_address;
         let first_tx = <DailyHolds<T>>::get(from.clone());
-        let deposit_message = <TransferMessages<T>>::get(first_tx.1);
         let daily_hold = T::BlockNumber::sa(DAY);
         let day_passed = first_tx.0 + daily_hold < T::BlockNumber::sa(0);
 
         if !day_passed {
+            let account_balance = <token::Module<T>>::balance_of(from);
             // 75% of potentially really big numbers
-            let allowed_amount = deposit_message
-                .amount
+            let allowed_amount = account_balance
                 .checked_div(100)
                 .expect("Failed to calculate allowed withdraw amount")
                 .checked_mul(75)
