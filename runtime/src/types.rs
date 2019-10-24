@@ -1,6 +1,6 @@
 use parity_codec::{Decode, Encode};
 use primitives::H160;
-
+use rstd::prelude::Vec;
 
 pub type MemberId = u64;
 pub type ProposalId = u64;

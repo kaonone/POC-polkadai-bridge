@@ -3,6 +3,7 @@
 /// and transfer tokens on substrate side freely or operate with total_supply
 ///
 use crate::types::{TokenBalance, Token, TokenId};
+use rstd::prelude::Vec;
 use runtime_primitives::traits::{StaticLookup, Zero};
 use support::{
     decl_event, decl_module, decl_storage, dispatch::Result, ensure, StorageMap, StorageValue,
