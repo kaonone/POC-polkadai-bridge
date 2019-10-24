@@ -39,6 +39,8 @@ pub enum Status {
     RemoveValidator,
     ChangeMinTx,
     ChangeMaxTx,
+    ChangePendingBurnLimit,
+    ChangePendingMintLimit,
     Deposit,
     Withdraw,
     Approved,
