@@ -35,10 +35,14 @@ struct Controller {
     config: Config,
     status: Status,
     controller_rx: Receiver<Events>,
-    executor_tx: Sender<Events>
+    executor_tx: Sender<Events>,
 }
 
-pub fn spawn(config: Config, controller_rx: Receiver<Events>, executor_tx: Sender<Events>) -> thread::JoinHandle<()> {
+pub fn spawn(
+    config: Config,
+    controller_rx: Receiver<Events>,
+    executor_tx: Sender<Events>,
+) -> thread::JoinHandle<()> {
     thread::Builder::new()
         .name("controller".to_string())
         .spawn(move || {
@@ -54,7 +58,7 @@ impl Controller {
             config,
             status: Status::NotReady,
             controller_rx,
-            executor_tx
+            executor_tx,
         }
     }
 
@@ -65,7 +69,7 @@ impl Controller {
             log::info!("received event: {:?}", event);
             match self.status {
                 Status::Active => self.executor_tx.send(event).expect("can not sent event"),
-                Status::NotReady | Status::Paused | Status::Stopped => ()
+                Status::NotReady | Status::Paused | Status::Stopped => (),
             }
         })
     }

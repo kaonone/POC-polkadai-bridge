@@ -7,8 +7,8 @@ use web3::{
 };
 
 use std::{
-    sync::{Arc, mpsc::Receiver},
-    thread
+    sync::{mpsc::Receiver, Arc},
+    thread,
 };
 
 use crate::config::Config;
@@ -47,7 +47,8 @@ impl Executor {
         sub_api.init();
         let sub_api = Arc::new(sub_api);
 
-        let (_eloop, transport) = web3::transports::WebSocket::new(&self.config.eth_api_url).unwrap();
+        let (_eloop, transport) =
+            web3::transports::WebSocket::new(&self.config.eth_api_url).unwrap();
         let web3 = web3::Web3::new(transport);
 
         let contact_abi = include_bytes!("../res/EthContract.abi");
@@ -60,24 +61,48 @@ impl Executor {
             log::info!("received event: {:?}", event);
             match event {
                 Events::EthRelayMessage(message_id, eth_address, sub_address, amount) => {
-                    handle_eth_relay_message(&self.config, web3.clone(), abi.clone(), message_id, eth_address, sub_address, amount)
-                },
+                    handle_eth_relay_message(
+                        &self.config,
+                        web3.clone(),
+                        abi.clone(),
+                        message_id,
+                        eth_address,
+                        sub_address,
+                        amount,
+                    )
+                }
                 Events::EthApprovedRelayMessage(message_id, eth_address, sub_address, amount) => {
-                    handle_eth_approved_relay_message(&self.config, sub_api.clone(), message_id, eth_address, sub_address, amount)
-                },
+                    handle_eth_approved_relay_message(
+                        &self.config,
+                        sub_api.clone(),
+                        message_id,
+                        eth_address,
+                        sub_address,
+                        amount,
+                    )
+                }
                 Events::EthWithdrawMessage(message_id) => {
                     handle_eth_withdraw_message(&self.config, sub_api.clone(), message_id)
-                },
+                }
                 Events::SubRelayMessage(message_id) => {
                     handle_sub_relay_message(&self.config, sub_api.clone(), message_id)
-                },
+                }
                 Events::SubApprovedRelayMessage(message_id, sub_address, eth_address, amount) => {
-                    handle_sub_approved_relay_message(&self.config, web3.clone(), abi.clone(), message_id, sub_address, eth_address, amount)
-                },
+                    handle_sub_approved_relay_message(
+                        &self.config,
+                        web3.clone(),
+                        abi.clone(),
+                        message_id,
+                        sub_address,
+                        eth_address,
+                        amount,
+                    )
+                }
                 Events::SubBurnedMessage(_message_id, _sub_address, _eth_address, _amount) => (),
-                Events::SubMintedMessage(message_id) => handle_sub_minted_message(&self.config, web3.clone(), abi.clone(), message_id),
+                Events::SubMintedMessage(message_id) => {
+                    handle_sub_minted_message(&self.config, web3.clone(), abi.clone(), message_id)
+                }
             }
-
         })
     }
 }
@@ -90,17 +115,11 @@ fn handle_eth_relay_message<T>(
     eth_address: H160,
     sub_address: H256,
     amount: U256,
-)
-where
+) where
     T: web3::Transport + Send + Sync + 'static,
     T::Out: Send,
 {
-    let args = (
-        message_id,
-        eth_address,
-        sub_address,
-        amount
-    );
+    let args = (message_id, eth_address, sub_address, amount);
     let eth_validator_private_key = config.eth_validator_private_key.clone();
     let eth_contract_address = config.eth_contract_address;
     let eth_gas_price = config.eth_gas_price;
@@ -136,7 +155,7 @@ fn handle_eth_approved_relay_message(
     message_id: H256,
     eth_address: H160,
     sub_address: H256,
-    amount: U256
+    amount: U256,
 ) {
     let message_id = primitives::H256::from_slice(&message_id.to_fixed_bytes());
     let eth_address = primitives::H160::from_slice(&eth_address.to_fixed_bytes());
@@ -195,12 +214,7 @@ fn handle_sub_approved_relay_message<T>(
     T: web3::Transport + Send + Sync + 'static,
     T::Out: Send,
 {
-    let args = (
-        message_id,
-        sub_address,
-        eth_address,
-        amount
-    );
+    let args = (message_id, sub_address, eth_address, amount);
     let eth_validator_private_key = config.eth_validator_private_key.clone();
     let eth_contract_address = config.eth_contract_address;
     let eth_gas_price = config.eth_gas_price;

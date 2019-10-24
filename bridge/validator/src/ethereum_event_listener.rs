@@ -3,12 +3,12 @@ use futures::stream::Stream;
 use log;
 use web3::{
     futures::Future,
-    types::{H256, Filter, FilterBuilder}
+    types::{Filter, FilterBuilder, H256},
 };
 
 use std::{
+    sync::{mpsc::Sender, Arc, Mutex},
     thread,
-    sync::{Arc, Mutex, mpsc::Sender}
 };
 
 use crate::config::Config;
@@ -16,17 +16,17 @@ use crate::controller::Events;
 
 struct EventListener {
     config: Config,
-    controller_tx: Arc<Mutex<Sender<Events>>>
+    controller_tx: Arc<Mutex<Sender<Events>>>,
 }
 
 pub fn spawn(config: Config, controller_tx: Sender<Events>) -> thread::JoinHandle<()> {
     thread::Builder::new()
-    .name("ethereum_event_listener".to_string())
-    .spawn(move || {
-        let event_listener = EventListener::new(config, controller_tx);
-        event_listener.start();
-    })
-    .expect("can not started ethereum_event_listener")
+        .name("ethereum_event_listener".to_string())
+        .spawn(move || {
+            let event_listener = EventListener::new(config, controller_tx);
+            event_listener.start();
+        })
+        .expect("can not started ethereum_event_listener")
 }
 
 impl EventListener {
@@ -34,12 +34,13 @@ impl EventListener {
         let controller_tx = Arc::new(Mutex::new(controller_tx));
         EventListener {
             config,
-            controller_tx
+            controller_tx,
         }
     }
 
     fn start(&self) {
-        let (_eloop, transport) = web3::transports::WebSocket::new(&self.config.eth_api_url).unwrap();
+        let (_eloop, transport) =
+            web3::transports::WebSocket::new(&self.config.eth_api_url).unwrap();
         let web3 = web3::Web3::new(transport);
 
         let controller_tx = self.controller_tx.clone();
@@ -82,16 +83,33 @@ impl EventListener {
                             if let Ok(params) = result {
                                 if params.len() >= 4 {
                                     let event = Events::EthRelayMessage(
-                                        H256::from_slice(&params[0].clone().to_fixed_bytes().expect("can not parse message_id")),
-                                        params[1].clone().to_address().expect("can not parse eth_address"),
-                                        H256::from_slice(&params[2].clone().to_fixed_bytes().expect("can not parse sub_address")),
-                                        params[3].clone().to_uint().expect("can not parse amount")
+                                        H256::from_slice(
+                                            &params[0]
+                                                .clone()
+                                                .to_fixed_bytes()
+                                                .expect("can not parse message_id"),
+                                        ),
+                                        params[1]
+                                            .clone()
+                                            .to_address()
+                                            .expect("can not parse eth_address"),
+                                        H256::from_slice(
+                                            &params[2]
+                                                .clone()
+                                                .to_fixed_bytes()
+                                                .expect("can not parse sub_address"),
+                                        ),
+                                        params[3].clone().to_uint().expect("can not parse amount"),
                                     );
-                                    controller_tx.lock().unwrap().send(event).expect("can not send event");
+                                    controller_tx
+                                        .lock()
+                                        .unwrap()
+                                        .send(event)
+                                        .expect("can not send event");
                                 }
                             }
                             Ok(())
-                        },
+                        }
                         (_, true, _) => {
                             let result = ethabi::decode(
                                 &[
@@ -104,34 +122,53 @@ impl EventListener {
                             );
                             if let Ok(params) = result {
                                 if params.len() >= 4 {
-                                   let event = Events::EthApprovedRelayMessage(
-                                        H256::from_slice(&params[0].clone().to_fixed_bytes().expect("can not parse message_id")),
-                                        params[1].clone().to_address().expect("can not parse eth_address"),
-                                        H256::from_slice(&params[2].clone().to_fixed_bytes().expect("can not parse sub_address")),
-                                        params[3].clone().to_uint().expect("can not parse amount")
+                                    let event = Events::EthApprovedRelayMessage(
+                                        H256::from_slice(
+                                            &params[0]
+                                                .clone()
+                                                .to_fixed_bytes()
+                                                .expect("can not parse message_id"),
+                                        ),
+                                        params[1]
+                                            .clone()
+                                            .to_address()
+                                            .expect("can not parse eth_address"),
+                                        H256::from_slice(
+                                            &params[2]
+                                                .clone()
+                                                .to_fixed_bytes()
+                                                .expect("can not parse sub_address"),
+                                        ),
+                                        params[3].clone().to_uint().expect("can not parse amount"),
                                     );
-                                    controller_tx.lock().unwrap().send(event).expect("can not send event");
+                                    controller_tx
+                                        .lock()
+                                        .unwrap()
+                                        .send(event)
+                                        .expect("can not send event");
                                 }
                             }
                             Ok(())
-                        },
+                        }
                         (_, _, true) => {
-                            let result = ethabi::decode(
-                                &[
-                                    ParamType::FixedBytes(32)
-                                ],
-                                &log.data.0,
-                            );
+                            let result = ethabi::decode(&[ParamType::FixedBytes(32)], &log.data.0);
                             if let Ok(params) = result {
                                 if !params.is_empty() {
-                                    let event = Events::EthWithdrawMessage(
-                                        H256::from_slice(&params[0].clone().to_fixed_bytes().expect("can not parse message_id"))
-                                    );
-                                    controller_tx.lock().unwrap().send(event).expect("can not send event");
+                                    let event = Events::EthWithdrawMessage(H256::from_slice(
+                                        &params[0]
+                                            .clone()
+                                            .to_fixed_bytes()
+                                            .expect("can not parse message_id"),
+                                    ));
+                                    controller_tx
+                                        .lock()
+                                        .unwrap()
+                                        .send(event)
+                                        .expect("can not send event");
                                 }
                             }
                             Ok(())
-                        },
+                        }
                         (_, _, _) => {
                             log::warn!("received unknown log: {:?}", log);
                             Ok(())

@@ -4,12 +4,12 @@ use env_logger;
 use std::sync::mpsc::channel;
 
 mod config;
-mod ethereum_transactions;
-mod substrate_transactions;
 mod controller;
+mod ethereum_event_listener;
+mod ethereum_transactions;
 mod executor;
 mod substrate_event_listener;
-mod ethereum_event_listener;
+mod substrate_transactions;
 
 fn main() {
     env_logger::init();
@@ -22,8 +22,10 @@ fn main() {
 
     let controller_thread = controller::spawn(config.clone(), controller_rx, executor_tx);
     let executor_thread = executor::spawn(config.clone(), executor_rx);
-    let ethereum_event_listener_thread = ethereum_event_listener::spawn(config.clone(), controller_tx.clone());
-    let substrate_event_listener_thread = substrate_event_listener::spawn(config.clone(), controller_tx.clone());
+    let ethereum_event_listener_thread =
+        ethereum_event_listener::spawn(config.clone(), controller_tx.clone());
+    let substrate_event_listener_thread =
+        substrate_event_listener::spawn(config.clone(), controller_tx.clone());
 
     let _ = controller_thread.join();
     let _ = executor_thread.join();
