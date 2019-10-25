@@ -201,6 +201,8 @@ fn testnet_genesis(
 		bridge: Some(BridgeConfig {
 			validator_accounts: bridge_validators,
 			validators_count: 3u32,
+			pending_burn_limit: 1000,
+			pending_mint_limit: 1000,
 		}),
 	}
 }
@@ -339,6 +341,8 @@ fn akropolis_staging_genesis() -> GenesisConfig {
 		bridge: Some(BridgeConfig {
 			validator_accounts: bridge_validators,
 			validators_count: 3u32, 
+			pending_burn_limit: 1000,
+			pending_mint_limit: 1000,
 		})
 	}
 }
