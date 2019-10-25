@@ -27,6 +27,7 @@ decl_event!(
     {
         RelayMessage(Hash),
         ApprovedRelayMessage(Hash, AccountId, H160, TokenBalance),
+        CancellationConfirmedMessage(Hash),
         MintedMessage(Hash),
         BurnedMessage(Hash, AccountId, H160, TokenBalance),
     }
@@ -345,6 +346,8 @@ decl_module! {
 
             <token::Module<T>>::unlock(&message.substrate_address, message.amount)?;
             <TransferMessages<T>>::insert(message_id, message);
+            
+            Self::deposit_event(RawEvent::CancellationConfirmedMessage(message_id));
 
             Ok(())
         }
