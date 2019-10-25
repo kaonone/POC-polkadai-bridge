@@ -1,10 +1,14 @@
 use dotenv::dotenv;
 use env_logger;
 
+use std::sync::mpsc::channel;
+
 mod config;
-mod ethereum_event_handler;
+mod controller;
+mod ethereum_event_listener;
 mod ethereum_transactions;
-mod substrate_event_handler;
+mod executor;
+mod substrate_event_listener;
 mod substrate_transactions;
 
 fn main() {
@@ -13,25 +17,18 @@ fn main() {
 
     let config = config::Config::load().expect("can not load config");
 
-    log::info!("[ethereum] api url: {:?}", config.eth_api_url);
-    log::info!(
-        "[ethereum] validator address: {:?}",
-        config.eth_validator_address
-    );
-    log::info!(
-        "[ethereum] contract address: {:?}",
-        config.eth_contract_address
-    );
-    log::info!(
-        "[ethereum] hash of RelayMessage: {:?}",
-        config.eth_relay_message_hash
-    );
-    log::info!(
-        "[ethereum] hash of ApprovedRelayMessage: {:?}",
-        config.eth_approved_relay_message_hash
-    );
-    log::info!("[substrate] api url: {:?}", config.sub_api_url);
+    let (controller_tx, controller_rx) = channel();
+    let (executor_tx, executor_rx) = channel();
 
-    let _substrate_event_handler = substrate_event_handler::start(config.clone());
-    ethereum_event_handler::start(config);
+    let controller_thread = controller::spawn(config.clone(), controller_rx, executor_tx);
+    let executor_thread = executor::spawn(config.clone(), executor_rx);
+    let ethereum_event_listener_thread =
+        ethereum_event_listener::spawn(config.clone(), controller_tx.clone());
+    let substrate_event_listener_thread =
+        substrate_event_listener::spawn(config.clone(), controller_tx.clone());
+
+    let _ = controller_thread.join();
+    let _ = executor_thread.join();
+    let _ = ethereum_event_listener_thread.join();
+    let _ = substrate_event_listener_thread.join();
 }
