@@ -1,0 +1,5 @@
+query MaxBlockNumber($blockNumber: Int!) {
+  messages(where: {ethBlockNumber_gte: $blockNumber}, orderBy: ethBlockNumber, orderDirection: desc, first: 1) {
+    ethBlockNumber
+  }
+}

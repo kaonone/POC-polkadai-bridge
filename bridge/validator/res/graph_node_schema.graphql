@@ -1,0 +1,44 @@
+type Query {
+    message(id: ID!): Message
+    messages(
+        skip: Int = 0
+        first: Int = 100
+        orderBy: Message_orderBy
+        orderDirection: OrderDirection
+        where: Message_filter
+    ): [Message!]!
+}
+
+type Subscription {
+    message(id: ID!): Message
+    messages(
+        skip: Int = 0
+        first: Int = 100
+        orderBy: Message_orderBy
+        orderDirection: OrderDirection
+        where: Message_filter
+    ): [Message!]!
+}
+
+type Message {
+  id: ID!
+  ethAddress: String!
+  subAddress: String!
+  amount: String!
+  status: Status!
+  direction: Direction!
+  ethBlockNumber: String!
+}
+
+enum Status {
+  PENDING
+  WITHDRAW
+  APPROVED
+  CANCELED
+  CONFIRMED
+}
+
+enum Direction {
+  ETH2SUB
+  SUB2ETH
+}
