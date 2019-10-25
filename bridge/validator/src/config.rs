@@ -1,6 +1,6 @@
 use primitives::{crypto::Pair, sr25519};
 use rustc_hex::FromHex;
-use web3::types::{Address, H256};
+use web3::types::Address;
 
 use raw_transaction_builder::Bip32ECKeyPair;
 
@@ -11,13 +11,11 @@ const DEFAULT_GAS: u64 = 5_000_000;
 
 #[derive(Clone, Debug)]
 pub struct Config {
+    pub graph_node_api_url: String,
     pub eth_api_url: String,
     pub eth_validator_address: Address,
     pub eth_validator_private_key: String,
     pub eth_contract_address: Address,
-    pub eth_relay_message_hash: H256,
-    pub eth_approved_relay_message_hash: H256,
-    pub eth_withdraw_message_hash: H256,
     pub eth_gas_price: u64,
     pub eth_gas: u64,
     pub sub_api_url: String,
@@ -27,19 +25,21 @@ pub struct Config {
 impl Config {
     pub fn load() -> Result<Self, &'static str> {
         Ok(Config {
+            graph_node_api_url: parse_graph_node_api_url()?,
             eth_api_url: parse_eth_api_url()?,
             eth_validator_address: parse_eth_validator_address()?,
             eth_validator_private_key: parse_eth_validator_private_key()?,
             eth_contract_address: parse_eth_contract_address()?,
-            eth_relay_message_hash: parse_eth_relay_message_hash()?,
-            eth_approved_relay_message_hash: parse_eth_approved_relay_message_hash()?,
-            eth_withdraw_message_hash: parse_eth_withdraw_message_hash()?,
             eth_gas_price: parse_eth_gas_price()?,
             eth_gas: parse_eth_gas()?,
             sub_api_url: parse_sub_api_url()?,
             sub_validator_mnemonic_phrase: parse_sub_validator_mnemonic_phrase()?,
         })
     }
+}
+
+fn parse_graph_node_api_url() -> Result<String, &'static str> {
+    env::var("GRAPH_NODE_API_URL").map_err(|_| "can not read GRAPH_NODE_API_URL")
 }
 
 fn parse_eth_api_url() -> Result<String, &'static str> {
@@ -69,30 +69,6 @@ fn parse_eth_contract_address() -> Result<Address, &'static str> {
     address[2..]
         .parse()
         .map_err(|_| "can not parse contract address")
-}
-
-fn parse_eth_relay_message_hash() -> Result<H256, &'static str> {
-    let hash =
-        env::var("ETH_RELAY_MESSAGE_HASH").map_err(|_| "can not read ETH_RELAY_MESSAGE_HASH")?;
-    hash[2..]
-        .parse()
-        .map_err(|_| "can not parse relay message hash")
-}
-
-fn parse_eth_approved_relay_message_hash() -> Result<H256, &'static str> {
-    let hash = env::var("ETH_APPROVED_RELAY_MESSAGE_HASH")
-        .map_err(|_| "can not read ETH_APPROVED_RELAY_MESSAGE_HASH")?;
-    hash[2..]
-        .parse()
-        .map_err(|_| "can not parse approved relay message hash")
-}
-
-fn parse_eth_withdraw_message_hash() -> Result<H256, &'static str> {
-    let hash = env::var("ETH_WITHDRAW_MESSAGE_HASH")
-        .map_err(|_| "can not read ETH_WITHDRAW_MESSAGE_HASH")?;
-    hash[2..]
-        .parse()
-        .map_err(|_| "can not parse withdraw message hash")
 }
 
 fn parse_eth_gas_price() -> Result<u64, &'static str> {
