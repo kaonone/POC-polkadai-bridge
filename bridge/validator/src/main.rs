@@ -5,9 +5,10 @@ use std::sync::mpsc::channel;
 
 mod config;
 mod controller;
-mod ethereum_event_listener;
+mod controller_storage;
 mod ethereum_transactions;
 mod executor;
+mod graph_node_event_listener;
 mod substrate_event_listener;
 mod substrate_transactions;
 
@@ -22,13 +23,13 @@ fn main() {
 
     let controller_thread = controller::spawn(config.clone(), controller_rx, executor_tx);
     let executor_thread = executor::spawn(config.clone(), executor_rx);
-    let ethereum_event_listener_thread =
-        ethereum_event_listener::spawn(config.clone(), controller_tx.clone());
+    let graph_node_event_listener_thread =
+        graph_node_event_listener::spawn(config.clone(), controller_tx.clone());
     let substrate_event_listener_thread =
         substrate_event_listener::spawn(config.clone(), controller_tx.clone());
 
     let _ = controller_thread.join();
     let _ = executor_thread.join();
-    let _ = ethereum_event_listener_thread.join();
+    let _ = graph_node_event_listener_thread.join();
     let _ = substrate_event_listener_thread.join();
 }

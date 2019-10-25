@@ -16,6 +16,9 @@ ethabi = "8.0.1"
 log = "0.4.0"
 env_logger = "0.6.2"
 dotenv = "0.14.1"
+graphql_client = "0.8.0"
+reqwest = "0.9.22"
+serde = "1.0.101"
 
 node-runtime = { path = '../../runtime/', package = 'erc20-substrate-bridge-runtime' }
 

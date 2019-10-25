@@ -1,6 +1,9 @@
+use futures::future::{lazy, poll_fn};
 use log;
 use primitives;
 use substrate_api_client::Api;
+use tokio::runtime::{Runtime, TaskExecutor};
+use tokio_threadpool::blocking;
 use web3::{
     futures::Future,
     types::{Bytes, H160, H256, U256},
@@ -43,6 +46,8 @@ impl Executor {
     }
 
     fn start(&self) {
+        let runtime = Runtime::new().expect("can not create tokio runtime");
+
         let mut sub_api = Api::new(self.config.sub_api_url.clone());
         sub_api.init();
         let sub_api = Arc::new(sub_api);
@@ -63,6 +68,7 @@ impl Executor {
                 Events::EthRelayMessage(message_id, eth_address, sub_address, amount) => {
                     handle_eth_relay_message(
                         &self.config,
+                        runtime.executor(),
                         web3.clone(),
                         abi.clone(),
                         message_id,
@@ -74,6 +80,7 @@ impl Executor {
                 Events::EthApprovedRelayMessage(message_id, eth_address, sub_address, amount) => {
                     handle_eth_approved_relay_message(
                         &self.config,
+                        runtime.executor(),
                         sub_api.clone(),
                         message_id,
                         eth_address,
@@ -81,15 +88,22 @@ impl Executor {
                         amount,
                     )
                 }
-                Events::EthWithdrawMessage(message_id) => {
-                    handle_eth_withdraw_message(&self.config, sub_api.clone(), message_id)
-                }
-                Events::SubRelayMessage(message_id) => {
-                    handle_sub_relay_message(&self.config, sub_api.clone(), message_id)
-                }
+                Events::EthWithdrawMessage(message_id) => handle_eth_withdraw_message(
+                    &self.config,
+                    runtime.executor(),
+                    sub_api.clone(),
+                    message_id,
+                ),
+                Events::SubRelayMessage(message_id) => handle_sub_relay_message(
+                    &self.config,
+                    runtime.executor(),
+                    sub_api.clone(),
+                    message_id,
+                ),
                 Events::SubApprovedRelayMessage(message_id, sub_address, eth_address, amount) => {
                     handle_sub_approved_relay_message(
                         &self.config,
+                        runtime.executor(),
                         web3.clone(),
                         abi.clone(),
                         message_id,
@@ -99,9 +113,13 @@ impl Executor {
                     )
                 }
                 Events::SubBurnedMessage(_message_id, _sub_address, _eth_address, _amount) => (),
-                Events::SubMintedMessage(message_id) => {
-                    handle_sub_minted_message(&self.config, web3.clone(), abi.clone(), message_id)
-                }
+                Events::SubMintedMessage(message_id) => handle_sub_minted_message(
+                    &self.config,
+                    runtime.executor(),
+                    web3.clone(),
+                    abi.clone(),
+                    message_id,
+                ),
             }
         })
     }
@@ -109,6 +127,7 @@ impl Executor {
 
 fn handle_eth_relay_message<T>(
     config: &Config,
+    task_executor: TaskExecutor,
     web3: Arc<web3::Web3<T>>,
     abi: Arc<ethabi::Contract>,
     message_id: H256,
@@ -146,11 +165,12 @@ fn handle_eth_relay_message<T>(
 
         })
         .map_err(|e| log::warn!("can not get nonce: {:?}", e));
-    tokio::run(fut);
+    task_executor.spawn(fut);
 }
 
 fn handle_eth_approved_relay_message(
     config: &Config,
+    task_executor: TaskExecutor,
     sub_api: Arc<Api>,
     message_id: H256,
     eth_address: H160,
@@ -160,50 +180,84 @@ fn handle_eth_approved_relay_message(
     let message_id = primitives::H256::from_slice(&message_id.to_fixed_bytes());
     let eth_address = primitives::H160::from_slice(&eth_address.to_fixed_bytes());
     let sub_address = primitives::sr25519::Public::from_slice(&sub_address.to_fixed_bytes());
-    let amount = amount.low_u64();
+    let amount = amount.low_u128();
     let sub_validator_mnemonic_phrase = config.sub_validator_mnemonic_phrase.clone();
 
-    substrate_transactions::mint(
-        sub_api,
-        sub_validator_mnemonic_phrase.clone(),
-        message_id,
-        eth_address,
-        sub_address.clone(),
-        amount,
-    );
-    log::info!(
-        "[substrate] called multi_signed_mint({:?}, {:?}, {:?}, {:?})",
-        message_id,
-        eth_address,
-        sub_address,
-        amount
-    );
+    task_executor.spawn(lazy(move || {
+        poll_fn(move || {
+            blocking(|| {
+                substrate_transactions::mint(
+                    sub_api.clone(),
+                    sub_validator_mnemonic_phrase.clone(),
+                    message_id,
+                    eth_address,
+                    sub_address.clone(),
+                    amount,
+                );
+                log::info!(
+                    "[substrate] called multi_signed_mint({:?}, {:?}, {:?}, {:?})",
+                    message_id,
+                    eth_address,
+                    sub_address,
+                    amount
+                );
+            })
+            .map_err(|_| panic!("the threadpool shut down"))
+        })
+    }));
 }
 
-fn handle_eth_withdraw_message(config: &Config, sub_api: Arc<Api>, message_id: H256) {
+fn handle_eth_withdraw_message(
+    config: &Config,
+    task_executor: TaskExecutor,
+    sub_api: Arc<Api>,
+    message_id: H256,
+) {
     let message_id = primitives::H256::from_slice(&message_id.to_fixed_bytes());
     let sub_validator_mnemonic_phrase = config.sub_validator_mnemonic_phrase.clone();
-    substrate_transactions::confirm_transfer(
-        &sub_api,
-        sub_validator_mnemonic_phrase.clone(),
-        message_id,
-    );
-    log::info!("[substrate] called confirm_transfer({:?})", message_id);
+
+    task_executor.spawn(lazy(move || {
+        poll_fn(move || {
+            blocking(|| {
+                substrate_transactions::confirm_transfer(
+                    &sub_api,
+                    sub_validator_mnemonic_phrase.clone(),
+                    message_id,
+                );
+                log::info!("[substrate] called confirm_transfer({:?})", message_id);
+            })
+            .map_err(|_| panic!("the threadpool shut down"))
+        })
+    }));
 }
 
-fn handle_sub_relay_message(config: &Config, sub_api: Arc<Api>, message_id: H256) {
+fn handle_sub_relay_message(
+    config: &Config,
+    task_executor: TaskExecutor,
+    sub_api: Arc<Api>,
+    message_id: H256,
+) {
     let message_id = primitives::H256::from_slice(&message_id.to_fixed_bytes());
     let sub_validator_mnemonic_phrase = config.sub_validator_mnemonic_phrase.clone();
-    substrate_transactions::approve_transfer(
-        &sub_api,
-        sub_validator_mnemonic_phrase.clone(),
-        message_id,
-    );
-    log::info!("[substrate] called approve_transfer({:?})", message_id);
+
+    task_executor.spawn(lazy(move || {
+        poll_fn(move || {
+            blocking(|| {
+                substrate_transactions::approve_transfer(
+                    &sub_api,
+                    sub_validator_mnemonic_phrase.clone(),
+                    message_id,
+                );
+                log::info!("[substrate] called approve_transfer({:?})", message_id);
+            })
+            .map_err(|_| panic!("the threadpool shut down"))
+        })
+    }));
 }
 
 fn handle_sub_approved_relay_message<T>(
     config: &Config,
+    task_executor: TaskExecutor,
     web3: Arc<web3::Web3<T>>,
     abi: Arc<ethabi::Contract>,
     message_id: H256,
@@ -245,11 +299,12 @@ fn handle_sub_approved_relay_message<T>(
             log::warn!("can not get nonce: {:?}", e);
             Ok(())
         });
-    tokio::run(fut);
+    task_executor.spawn(fut);
 }
 
 fn handle_sub_minted_message<T>(
     config: &Config,
+    task_executor: TaskExecutor,
     web3: Arc<web3::Web3<T>>,
     abi: Arc<ethabi::Contract>,
     message_id: H256,
@@ -287,5 +342,5 @@ fn handle_sub_minted_message<T>(
             log::warn!("can not get nonce: {:?}", e);
             Ok(())
         });
-    tokio::run(fut);
+    task_executor.spawn(fut);
 }
