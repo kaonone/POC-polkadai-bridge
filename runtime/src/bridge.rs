@@ -43,7 +43,6 @@ decl_storage! {
         MaxLimit get(max_tx_limit): TokenBalance = 1000;
         MinLimit get(min_tx_limit): TokenBalance = 10;
         LimitMessages get(limit_messages): map(T::Hash) => LimitMessage<T::Hash>;
-        
         PendingBurnLimit get(pending_burn_limit) config(): u128;
         PendingMintLimit get(pending_mint_limit) config(): u128;
         PendingBurnCount get(pending_burn_count): u128;
@@ -58,14 +57,13 @@ decl_storage! {
         DailyHolds get(daily_holds): map(T::AccountId) => (T::BlockNumber, T::Hash);
 
         ValidatorsCount get(validators_count) config(): u32 = 3;
+        ValidatorVotes get(validator_votes): map(ProposalId, T::AccountId) => bool;
         ValidatorHistory get(validator_history): map (T::Hash) => ValidatorMessage<T::AccountId, T::Hash>;
         Validators get(validators) build(|config: &GenesisConfig<T>| {
             config.validator_accounts.clone().into_iter()
             .map(|acc: T::AccountId| (acc, true)).collect::<Vec<_>>()
         }): map (T::AccountId) => bool;
-    }
-    add_extra_genesis {
-        config(validator_accounts): Vec<T::AccountId>;
+        ValidatorAccounts get(validator_accounts) config(): Vec<T::AccountId>;
     }
 }
 
@@ -107,7 +105,7 @@ decl_module! {
             let can_mint = <PendingMintCount<T>>::get() < <PendingMintLimit<T>>::get();
             ensure!(can_mint, "Too many pending mint transactions.");
 
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
             Self::check_amount(amount)?;
 
             if !<TransferMessages<T>>::exists(message_id) {
@@ -124,14 +122,13 @@ decl_module! {
             }
 
             let transfer_id = <TransferId<T>>::get(message_id);
-            Self::_sign(transfer_id)
+            Self::_sign(validator, transfer_id)
         }
-
         // change minimum tx limit
         fn change_min_limit(origin, message_id: T::Hash, #[compact] amount: TokenBalance)-> Result {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
             Self::check_limit(amount)?;
 
             if !<LimitMessages<T>>::exists(message_id) {
@@ -146,14 +143,14 @@ decl_module! {
             }
 
             let transfer_id = <TransferId<T>>::get(message_id);
-            Self::_sign(transfer_id)
+            Self::_sign(validator, transfer_id)
         }
 
         // change maximum tx limit
         fn change_max_limit(origin, message_id: T::Hash, #[compact] amount: TokenBalance)-> Result {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
             Self::check_limit(amount)?;
 
             if !<LimitMessages<T>>::exists(message_id) {
@@ -168,14 +165,14 @@ decl_module! {
             }
 
             let transfer_id = <TransferId<T>>::get(message_id);
-            Self::_sign(transfer_id)
+            Self::_sign(validator, transfer_id)
         }
 
         // set maximum pending burn transaction limit
         fn set_pending_burn_limit(origin, message_id: T::Hash, #[compact] amount: TokenBalance)-> Result {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
 
             if !<LimitMessages<T>>::exists(message_id) {
                 let message = LimitMessage{
@@ -189,14 +186,14 @@ decl_module! {
             }
 
             let transfer_id = <TransferId<T>>::get(message_id);
-            Self::_sign(transfer_id)
+            Self::_sign(validator, transfer_id)
         }
 
         // set maximum pending mint transaction limit
         fn set_pending_mint_limit(origin, message_id: T::Hash, #[compact] amount: TokenBalance)-> Result {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
 
             if !<LimitMessages<T>>::exists(message_id) {
                 let message = LimitMessage{
@@ -210,24 +207,24 @@ decl_module! {
             }
 
             let transfer_id = <TransferId<T>>::get(message_id);
-            Self::_sign(transfer_id)
+            Self::_sign(validator, transfer_id)
         }
 
         // validator`s response to RelayMessage
         fn approve_transfer(origin, message_id: T::Hash) -> Result {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
 
             let id = <TransferId<T>>::get(message_id);
-            Self::_sign(id)
+            Self::_sign(validator, id)
         }
 
         // each validator calls it to add new validator
         fn add_validator(origin, address: T::AccountId) -> Result {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
 
             ensure!(<ValidatorsCount<T>>::get() < 100_000, "Validators maximum reached.");
             let hash = ("add", &address).using_encoded(<T as system::Trait>::Hashing::hash);
@@ -244,14 +241,14 @@ decl_module! {
             }
 
             let id = <TransferId<T>>::get(hash);
-            Self::_sign(id)
+            Self::_sign(validator, id)
         }
 
         // each validator calls it to remove new validator
         fn remove_validator(origin, address: T::AccountId) -> Result {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
 
             ensure!(<ValidatorsCount<T>>::get() > 1, "Can not remove last validator.");
 
@@ -269,7 +266,7 @@ decl_module! {
             }
 
             let id = <TransferId<T>>::get(hash);
-            Self::_sign(id)
+            Self::_sign(validator, id)
         }
 
         // each validator calls it to pause the bridge
@@ -283,7 +280,7 @@ decl_module! {
             if !<BridgeMessages<T>>::exists(hash) {
                 let message = BridgeMessage {
                     message_id: hash,
-                    account: validator,
+                    account: validator.clone(),
                     action: Status::PauseTheBridge,
                     status: Status::PauseTheBridge,
                 };
@@ -292,7 +289,7 @@ decl_module! {
             }
 
             let id = <TransferId<T>>::get(hash);
-            Self::_sign(id)
+            Self::_sign(validator, id)
         }
 
         // each validator calls it to resume the bridge
@@ -305,7 +302,7 @@ decl_module! {
             if !<BridgeMessages<T>>::exists(hash) {
                 let message = BridgeMessage {
                     message_id: hash,
-                    account: validator,
+                    account: validator.clone(),
                     action: Status::ResumeTheBridge,
                     status: Status::ResumeTheBridge,
                 };
@@ -314,14 +311,14 @@ decl_module! {
             }
 
             let id = <TransferId<T>>::get(hash);
-            Self::_sign(id)
+            Self::_sign(validator, id)
         }
 
         //confirm burn from validator
         fn confirm_transfer(origin, message_id: T::Hash) -> Result {
             let validator = ensure_signed(origin)?;
             ensure!(Self::bridge_is_operational(), "Bridge is not operational");
-            Self::check_validator(validator)?;
+            Self::check_validator(validator.clone())?;
 
             let id = <TransferId<T>>::get(message_id);
 
@@ -331,7 +328,9 @@ decl_module! {
 
             Self::update_status(message_id, Status::Confirmed, Kind::Transfer)?;
             Self::reopen_for_burn_confirmation(message_id)?;
-            Self::_sign(id)
+            Self::_sign(validator, id)?;
+
+            Ok(())
         }
 
         //cancel burn from validator
@@ -352,13 +351,15 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    fn _sign(transfer_id: ProposalId) -> Result {
+    fn _sign(validator: T::AccountId, transfer_id: ProposalId) -> Result {
         let mut transfer = <BridgeTransfers<T>>::get(transfer_id);
 
         let mut message = <TransferMessages<T>>::get(transfer.message_id);
         let mut limit_message = <LimitMessages<T>>::get(transfer.message_id);
         let mut validator_message = <ValidatorHistory<T>>::get(transfer.message_id);
         let mut bridge_message = <BridgeMessages<T>>::get(transfer.message_id);
+        let voted = <ValidatorVotes<T>>::get((transfer_id, validator.clone()));
+        ensure!(!voted, "This validator has already voted.");
         ensure!(transfer.open, "This transfer is not open");
         transfer.votes += 1;
 
@@ -386,6 +387,7 @@ impl<T: Trait> Module<T> {
             };
         }
 
+        <ValidatorVotes<T>>::mutate((transfer_id, validator), |a| *a = true);
         <BridgeTransfers<T>>::insert(transfer_id, transfer);
 
         Ok(())
@@ -463,15 +465,22 @@ impl<T: Trait> Module<T> {
 
     /// add validator
     fn _add_validator(info: ValidatorMessage<T::AccountId, T::Hash>) -> Result {
-        ensure!(<ValidatorsCount<T>>::get() < MAX_VALIDATORS, "Validators maximum reached.");
-        <Validators<T>>::insert(info.account, true);
+        ensure!(
+            <ValidatorsCount<T>>::get() < MAX_VALIDATORS,
+            "Validators maximum reached."
+        );
+        <Validators<T>>::insert(info.account.clone(), true);
+        <ValidatorAccounts<T>>::mutate(|v| v.retain(|x| *x != info.account));
         <ValidatorsCount<T>>::mutate(|x| *x += 1);
         Self::update_status(info.message_id, Status::Confirmed, Kind::Validator)
     }
 
     /// remove validator
     fn _remove_validator(info: ValidatorMessage<T::AccountId, T::Hash>) -> Result {
-        ensure!(<ValidatorsCount<T>>::get() > 1, "Can not remove last validator.");
+        ensure!(
+            <ValidatorsCount<T>>::get() > 1,
+            "Can not remove last validator."
+        );
         <Validators<T>>::remove(info.account);
         <ValidatorsCount<T>>::mutate(|x| *x -= 1);
         <ValidatorHistory<T>>::remove(info.message_id);
@@ -498,7 +507,12 @@ impl<T: Trait> Module<T> {
         <token::Module<T>>::unlock(&from, message.amount)?;
         <token::Module<T>>::_burn(from.clone(), message.amount)?;
 
-        Self::deposit_event(RawEvent::BurnedMessage(message_id, from, to, message.amount));
+        Self::deposit_event(RawEvent::BurnedMessage(
+            message_id,
+            from,
+            to,
+            message.amount,
+        ));
         Ok(())
     }
 
@@ -578,7 +592,6 @@ impl<T: Trait> Module<T> {
         let new_bridge_transfers_count = bridge_transfers_count
             .checked_add(1)
             .ok_or("Overflow adding a new bridge transfer")?;
-
         let transfer = BridgeTransfer {
             transfer_id,
             message_id: transfer_hash,
@@ -598,14 +611,14 @@ impl<T: Trait> Module<T> {
         let message_id = <MessageId<T>>::get(transfer_id);
         match kind {
             Kind::Transfer => {
-                    let message = <TransferMessages<T>>::get(message_id);
-                    match message.action {
-                        Status::Withdraw => <PendingBurnCount<T>>::mutate(|c| *c += 1), 
-                        Status::Deposit => <PendingMintCount<T>>::mutate(|c| *c += 1), 
-                        _ => ()
-                    }
+                let message = <TransferMessages<T>>::get(message_id);
+                match message.action {
+                    Status::Withdraw => <PendingBurnCount<T>>::mutate(|c| *c += 1),
+                    Status::Deposit => <PendingMintCount<T>>::mutate(|c| *c += 1),
+                    _ => (),
+                }
             }
-            _ => ()
+            _ => (),
         }
         Self::update_status(message_id, Status::Pending, kind)
     }
@@ -636,6 +649,7 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
+    // needed because @message_id will be the same as initial
     fn reopen_for_burn_confirmation(message_id: T::Hash) -> Result {
         let message = <TransferMessages<T>>::get(message_id);
         let transfer_id = <TransferId<T>>::get(message_id);
@@ -644,6 +658,10 @@ impl<T: Trait> Module<T> {
             transfer.votes = 0;
             transfer.open = true;
             <BridgeTransfers<T>>::insert(transfer_id, transfer);
+            let validators = <ValidatorAccounts<T>>::get();
+            validators
+                .iter()
+                .for_each(|a| <ValidatorVotes<T>>::insert((transfer_id, a.clone()), false));
         }
         Ok(())
     }
@@ -658,8 +676,14 @@ impl<T: Trait> Module<T> {
         let max = <MaxLimit<T>>::get() * 10u128.pow(token.decimals.into());
         let min = <MinLimit<T>>::get() * 10u128.pow(token.decimals.into());
 
-        ensure!(amount > min, "Invalid amount for transaction. Reached minimum limit.");
-        ensure!(amount < max, "Invalid amount for transaction. Reached maximum limit.");
+        ensure!(
+            amount > min,
+            "Invalid amount for transaction. Reached minimum limit."
+        );
+        ensure!(
+            amount < max,
+            "Invalid amount for transaction. Reached maximum limit."
+        );
 
         Ok(())
     }
@@ -691,8 +715,8 @@ impl<T: Trait> Module<T> {
             if message.amount > allowed_amount {
                 Self::update_status(message.message_id, Status::Canceled, Kind::Transfer)?;
                 fail!("Cannot withdraw more that 75% of first day deposit.");
-}
-}
+            }
+        }
 
         Ok(())
     }
@@ -802,7 +826,7 @@ mod tests {
                 validators_count: 3u32,
                 validator_accounts: vec![V1, V2, V3],
                 pending_burn_limit: 2,
-			    pending_mint_limit: 2,
+                pending_mint_limit: 2,
             }
             .build_storage()
             .unwrap()
@@ -962,7 +986,6 @@ mod tests {
             ));
             // assert_ok!(BridgeModule::confirm_transfer(Origin::signed(USER1), sub_message_id));
             //BurnedMessage(Hash, AccountId, H160, u64) event emitted
-            
             let tokens_left = amount1 - amount2;
             assert_eq!(TokenModule::balance_of(USER2), tokens_left);
             assert_eq!(TokenModule::total_supply(), tokens_left);
@@ -1125,6 +1148,17 @@ mod tests {
         })
     }
     #[test]
+    fn double_vote_should_fail() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_eq!(BridgeModule::bridge_is_operational(), true);
+            assert_ok!(BridgeModule::pause_bridge(Origin::signed(V2)));
+            assert_noop!(
+                BridgeModule::pause_bridge(Origin::signed(V2)),
+                "This validator has already voted."
+            );
+        })
+    }
+    #[test]
     fn change_min_limit_should_work() {
         with_externalities(&mut new_test_ext(), || {
             const LESS_THAN_MINIMUM: u128 = 5;
@@ -1240,7 +1274,6 @@ mod tests {
             //     BridgeModule::approve_transfer(Origin::signed(V2), sub_message_id),
             //     "Cannot withdraw more that 75% of first day deposit."
             // );
-            
             // signs the transfer, but fails further and marks message as Canceled
             let _ = BridgeModule::approve_transfer(Origin::signed(V2), sub_message_id);
 
@@ -1338,11 +1371,10 @@ mod tests {
             ));
 
             assert_eq!(BridgeModule::pending_burn_count(), 2);
-            assert_noop!(BridgeModule::set_transfer(
-                Origin::signed(USER2),
-                eth_address,
-                amount1 - amount2
-            ), "Too many pending burn transactions.");
+            assert_noop!(
+                BridgeModule::set_transfer(Origin::signed(USER2), eth_address, amount1 - amount2),
+                "Too many pending burn transactions."
+            );
         })
     }
     #[test]
@@ -1374,14 +1406,16 @@ mod tests {
             ));
 
             //substrate <----- ETH
-            assert_noop!(BridgeModule::multi_signed_mint(
-                Origin::signed(V2),
-                eth_message_id3,
-                eth_address,
-                USER2,
-                amount1 - amount2
-            ), "Too many pending mint transactions.");
-
+            assert_noop!(
+                BridgeModule::multi_signed_mint(
+                    Origin::signed(V2),
+                    eth_message_id3,
+                    eth_address,
+                    USER2,
+                    amount1 - amount2
+                ),
+                "Too many pending mint transactions."
+            );
         })
     }
 }

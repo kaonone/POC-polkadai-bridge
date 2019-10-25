@@ -1,3 +1,5 @@
+[![version](https://img.shields.io/badge/version-0.2-blue)](https://medium.com/akropolis)
+
 # DAI Ethereum  <-> Parity Substrate Bridge
  Ethereum <-> Parity Substrate Blockchain bridge for self transfers of DAI Token (ERC20) to sDAI (ERC20 representation).
 
