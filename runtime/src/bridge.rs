@@ -224,7 +224,6 @@ decl_module! {
         // each validator calls it to add new validator
         fn add_validator(origin, address: T::AccountId) -> Result {
             let validator = ensure_signed(origin)?;
-            ensure!(Self::bridge_is_operational(), "Bridge is not operational");
             Self::check_validator(validator.clone())?;
 
             ensure!(<ValidatorsCount<T>>::get() < 100_000, "Validators maximum reached.");
@@ -248,7 +247,6 @@ decl_module! {
         // each validator calls it to remove new validator
         fn remove_validator(origin, address: T::AccountId) -> Result {
             let validator = ensure_signed(origin)?;
-            ensure!(Self::bridge_is_operational(), "Bridge is not operational");
             Self::check_validator(validator.clone())?;
 
             ensure!(<ValidatorsCount<T>>::get() > 1, "Can not remove last validator.");
