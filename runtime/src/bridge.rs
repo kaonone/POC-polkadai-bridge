@@ -7,6 +7,7 @@ use crate::types::{
     BridgeMessage, BridgeTransfer, Kind, LimitMessage, MemberId, ProposalId, Status, TokenBalance,
     TransferMessage, ValidatorMessage,
 };
+use rstd::prelude::Vec;
 use parity_codec::Encode;
 use primitives::H160;
 use runtime_primitives::traits::{As, Hash};
