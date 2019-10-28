@@ -8,10 +8,8 @@ use node_runtime;
 use primitives::{blake2_256, crypto::Pair, hexdisplay::HexDisplay, sr25519};
 use runtime_primitives::generic::Era;
 
-use std::sync::Arc;
-
 pub fn mint(
-    sub_api: Arc<Api>,
+    sub_api: &Api,
     signer_mnemonic_phrase: String,
     message_id: primitives::H256,
     from: primitives::H160,
@@ -36,6 +34,20 @@ pub fn approve_transfer(
     message_id: primitives::H256,
 ) {
     let xthex = build_approve_transfer(
+        &sub_api,
+        get_sr25519_pair(&signer_mnemonic_phrase),
+        message_id,
+    );
+    //send and watch extrinsic until finalized
+    let _tx_hash = sub_api.send_extrinsic(xthex);
+}
+
+pub fn cancel_transfer(
+    sub_api: &Api,
+    signer_mnemonic_phrase: String,
+    message_id: primitives::H256,
+) {
+    let xthex = build_cancel_transfer(
         &sub_api,
         get_sr25519_pair(&signer_mnemonic_phrase),
         message_id,
@@ -97,6 +109,30 @@ pub fn build_approve_transfer(sub_api: &Api, signer: sr25519::Pair, message_id: 
     let signer_index = signer_index(sub_api, &signer);
     let genesis_hash = sub_api.genesis_hash.expect("can not get genesiss hash");
     let function = Call::Bridge(BridgeCall::approve_transfer(message_id));
+    let era = Era::immortal();
+
+    log::debug!("using genesis hash: {:?}", genesis_hash);
+    let raw_payload = (Compact(signer_index), function, era, genesis_hash);
+    let signature = sign_raw_payload(&raw_payload, &signer);
+    let ext = UncheckedExtrinsic::new_signed(
+        signer_index,
+        raw_payload.1,
+        signer.public().into(),
+        signature,
+        era,
+    );
+
+    log::debug!("extrinsic: {:?}", ext);
+
+    let mut xthex: String = ext.encode().to_hex();
+    xthex.insert_str(0, "0x");
+    xthex
+}
+
+pub fn build_cancel_transfer(sub_api: &Api, signer: sr25519::Pair, message_id: H256) -> String {
+    let signer_index = signer_index(sub_api, &signer);
+    let genesis_hash = sub_api.genesis_hash.expect("can not get genesiss hash");
+    let function = Call::Bridge(BridgeCall::cancel_transfer(message_id));
     let era = Era::immortal();
 
     log::debug!("using genesis hash: {:?}", genesis_hash);

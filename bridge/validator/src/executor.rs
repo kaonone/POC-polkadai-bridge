@@ -88,6 +88,14 @@ impl Executor {
                         amount,
                     )
                 }
+                Events::EthRevertMessage(message_id, _eth_address, _amount) => {
+                    handle_eth_revert_message(
+                        &self.config,
+                        runtime.executor(),
+                        sub_api.clone(),
+                        message_id,
+                    )
+                }
                 Events::EthWithdrawMessage(message_id) => handle_eth_withdraw_message(
                     &self.config,
                     runtime.executor(),
@@ -187,7 +195,7 @@ fn handle_eth_approved_relay_message(
         poll_fn(move || {
             blocking(|| {
                 substrate_transactions::mint(
-                    sub_api.clone(),
+                    &sub_api.clone(),
                     sub_validator_mnemonic_phrase.clone(),
                     message_id,
                     eth_address,
@@ -201,6 +209,30 @@ fn handle_eth_approved_relay_message(
                     sub_address,
                     amount
                 );
+            })
+            .map_err(|_| panic!("the threadpool shut down"))
+        })
+    }));
+}
+
+fn handle_eth_revert_message(
+    config: &Config,
+    task_executor: TaskExecutor,
+    sub_api: Arc<Api>,
+    message_id: H256,
+) {
+    let message_id = primitives::H256::from_slice(&message_id.to_fixed_bytes());
+    let sub_validator_mnemonic_phrase = config.sub_validator_mnemonic_phrase.clone();
+
+    task_executor.spawn(lazy(move || {
+        poll_fn(move || {
+            blocking(|| {
+                substrate_transactions::cancel_transfer(
+                    &sub_api.clone(),
+                    sub_validator_mnemonic_phrase.clone(),
+                    message_id,
+                );
+                log::info!("[substrate] called cancel_transfer({:?})", message_id);
             })
             .map_err(|_| panic!("the threadpool shut down"))
         })

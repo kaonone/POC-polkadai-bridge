@@ -1,7 +1,7 @@
 use graphql_client::{GraphQLQuery, Response};
 use reqwest;
 use rustc_hex::FromHex;
-use web3::types::{H160, H256};
+use web3::types::{H160, H256, U256};
 
 use std::{sync::mpsc::Sender, thread, time::Duration};
 
@@ -136,7 +136,7 @@ fn convert_message(message: &all_messages::AllMessagesMessages) -> Events {
                 parse_h256(&message.id),
                 parse_h160(&message.eth_address),
                 parse_h256(&message.sub_address),
-                message.amount.parse().expect("can not parse amount"),
+                parse_u256(&message.amount),
             )
         }
         (all_messages::Status::APPROVED, all_messages::Direction::ETH2SUB) => {
@@ -144,7 +144,14 @@ fn convert_message(message: &all_messages::AllMessagesMessages) -> Events {
                 parse_h256(&message.id),
                 parse_h160(&message.eth_address),
                 parse_h256(&message.sub_address),
-                message.amount.parse().expect("can not parse amount"),
+                parse_u256(&message.amount),
+            )
+        }
+        (all_messages::Status::CANCELED, all_messages::Direction::ETH2SUB) => {
+            Events::EthRevertMessage(
+                parse_h256(&message.id),
+                parse_h160(&message.eth_address),
+                parse_u256(&message.amount),
             )
         }
         (all_messages::Status::WITHDRAW, all_messages::Direction::SUB2ETH) => {
@@ -155,7 +162,7 @@ fn convert_message(message: &all_messages::AllMessagesMessages) -> Events {
             parse_h256(&message.id),
             parse_h160(&message.eth_address),
             parse_h256(&message.sub_address),
-            message.amount.parse().expect("can not parse amount"),
+            parse_u256(&message.amount),
         ),
     }
 }
@@ -166,4 +173,8 @@ fn parse_h256(hash: &str) -> H256 {
 
 fn parse_h160(hash: &str) -> H160 {
     H160::from_slice(&hash[2..].from_hex::<Vec<_>>().expect("can not parse H160"))
+}
+
+fn parse_u256(maybe_u256: &str) -> U256 {
+    maybe_u256.parse().expect("can not parse U256")
 }

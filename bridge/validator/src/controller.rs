@@ -16,6 +16,7 @@ type Amount = U256;
 pub enum Events {
     EthRelayMessage(MessageId, EthAddress, SubAddress, Amount),
     EthApprovedRelayMessage(MessageId, EthAddress, SubAddress, Amount),
+    EthRevertMessage(MessageId, EthAddress, Amount),
     EthWithdrawMessage(MessageId),
     SubRelayMessage(MessageId),
     SubApprovedRelayMessage(MessageId, SubAddress, EthAddress, Amount),
@@ -59,6 +60,7 @@ impl Events {
         match self {
             Self::EthRelayMessage(message_id, _, _, _) => message_id,
             Self::EthApprovedRelayMessage(message_id, _, _, _) => message_id,
+            Self::EthRevertMessage(message_id, _, _) => message_id,
             Self::EthWithdrawMessage(message_id) => message_id,
             Self::SubRelayMessage(message_id) => message_id,
             Self::SubApprovedRelayMessage(message_id, _, _, _) => message_id,
