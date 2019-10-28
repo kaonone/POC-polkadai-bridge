@@ -137,13 +137,6 @@ This guide will walk you through how to create an account and how to connect to 
     "decimals": "u16",
     "symbol": "Vec<u8>"
   },
-  "BridgeTransfer": {
-    "transfer_id": "ProposalId",
-    "message_id": "H256",
-    "open": "bool",
-    "votes": "MemberId"
-    "kind": "Kind"
-  },
   "Status": {
       "_enum":[
         "Revoked",
@@ -176,12 +169,6 @@ This guide will walk you through how to create an account and how to connect to 
       "status": "Status",
       "direction": "Status"
   },
-    "ValidatorMessage": {
-      "message_id": "H256",
-      "account": "AccountId",
-      "status": "Status",
-      "action": "Status"
-  },
     "LimitMessage": {
       "message_id": "H256",
       "amount": "TokenBalance",
@@ -193,6 +180,13 @@ This guide will walk you through how to create an account and how to connect to 
       "account": "AccountId",
       "status": "Status",
       "action": "Status"
+  },
+  "BridgeTransfer": {
+    "transfer_id": "ProposalId",
+    "message_id": "H256",
+    "open": "bool",
+    "votes": "MemberId"
+    "kind": "Kind"
   },
 }
 
