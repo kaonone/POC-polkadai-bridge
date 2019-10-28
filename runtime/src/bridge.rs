@@ -5,11 +5,11 @@
 use crate::token;
 use crate::types::{
     BridgeMessage, BridgeTransfer, Kind, LimitMessage, MemberId, ProposalId, Status, TokenBalance,
-    TransferMessage
+    TransferMessage,
 };
-use rstd::prelude::Vec;
 use parity_codec::Encode;
 use primitives::H160;
+use rstd::prelude::Vec;
 use runtime_primitives::traits::{As, Hash};
 use support::{
     decl_event, decl_module, decl_storage, dispatch::Result, ensure, fail, StorageMap, StorageValue,
@@ -558,11 +558,11 @@ impl<T: Trait> Module<T> {
         match message.action {
             Status::ChangeMinTx => match message.status {
                 Status::Approved => Self::_change_min_limit(message),
-                _ => Err("Tried to pause the bridge with non-supported status"),
+                _ => Err("Tried to change min transaction with non-supported status"),
             },
             Status::ChangeMaxTx => match message.status {
                 Status::Approved => Self::_change_max_limit(message),
-                _ => Err("Tried to resume the bridge with non-supported status"),
+                _ => Err("Tried to change max transaction with non-supported status"),
             },
             Status::ChangePendingBurnLimit => match message.status {
                 Status::Approved => Self::_change_pending_burn_limit(message),
@@ -602,18 +602,16 @@ impl<T: Trait> Module<T> {
 
         Ok(())
     }
+
     fn set_pending(transfer_id: ProposalId, kind: Kind) -> Result {
         let message_id = <MessageId<T>>::get(transfer_id);
-        match kind {
-            Kind::Transfer => {
-                let message = <TransferMessages<T>>::get(message_id);
-                match message.action {
-                    Status::Withdraw => <PendingBurnCount<T>>::mutate(|c| *c += 1),
-                    Status::Deposit => <PendingMintCount<T>>::mutate(|c| *c += 1),
-                    _ => (),
-                }
+        if kind == Kind::Transfer {
+            let message = <TransferMessages<T>>::get(message_id);
+            match message.action {
+                Status::Withdraw => <PendingBurnCount<T>>::mutate(|c| *c += 1),
+                Status::Deposit => <PendingMintCount<T>>::mutate(|c| *c += 1),
+                _ => (),
             }
-            _ => (),
         }
         Self::update_status(message_id, Status::Pending, kind)
     }

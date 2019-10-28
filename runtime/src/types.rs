@@ -48,7 +48,7 @@ pub enum Status {
     Confirmed,
 }
 
-#[derive(Encode, Decode, Clone)]
+#[derive(Encode, Decode, Clone, PartialEq)]
 #[cfg_attr(feature = "std", derive(Debug))]
 pub enum Kind {
     Transfer,
@@ -126,8 +126,8 @@ where
         BridgeMessage {
             message_id: H::default(),
             account: A::default(),
-            action: Status::PauseTheBridge,
-            status: Status::PauseTheBridge,
+            action: Status::Revoked,
+            status: Status::Revoked,
         }
     }
 }
