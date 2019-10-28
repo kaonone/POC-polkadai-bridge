@@ -70,15 +70,6 @@ pub struct TransferMessage<AccountId, Hash> {
 
 #[derive(Encode, Decode, Clone)]
 #[cfg_attr(feature = "std", derive(Debug))]
-pub struct ValidatorMessage<AccountId, Hash> {
-    pub message_id: Hash,
-    pub account: AccountId,
-    pub action: Status,
-    pub status: Status,
-}
-
-#[derive(Encode, Decode, Clone)]
-#[cfg_attr(feature = "std", derive(Debug))]
 pub struct LimitMessage<Hash> {
     pub message_id: Hash,
     pub amount: TokenBalance,
@@ -108,21 +99,6 @@ where
             amount: TokenBalance::default(),
             status: Status::Withdraw,
             action: Status::Withdraw,
-        }
-    }
-}
-
-impl<A, H> Default for ValidatorMessage<A, H>
-where
-    A: Default,
-    H: Default,
-{
-    fn default() -> Self {
-        ValidatorMessage {
-            message_id: H::default(),
-            account: A::default(),
-            action: Status::Revoked,
-            status: Status::Revoked,
         }
     }
 }
