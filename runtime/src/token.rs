@@ -75,7 +75,7 @@ decl_module! {
             let sender = ensure_signed(origin)?;
             let allowance = Self::allowance_of((from.clone(), sender.clone()));
 
-            let updated_allowance = allowance.checked_sub(value).ok_or("underflow in calculating allowance")?;
+            let updated_allowance = allowance.checked_sub(value).ok_or("Underflow in calculating allowance")?;
 
             Self::make_transfer(from.clone(), to.clone(), value)?;
 
@@ -98,14 +98,14 @@ impl<T: Trait> Module<T> {
             free_balance > TokenBalance::zero(),
             "Cannot burn with zero balance"
         );
-        ensure!(free_balance >= amount, "not enough because of locked funds");
+        ensure!(free_balance >= amount, "Not enough because of locked funds");
 
         let next_balance = free_balance
             .checked_sub(amount)
-            .ok_or("underflow subtracting from balance burn")?;
+            .ok_or("Underflow subtracting from balance burn")?;
         let next_total = Self::total_supply()
             .checked_sub(amount)
-            .ok_or("underflow subtracting from total supply")?;
+            .ok_or("Underflow subtracting from total supply")?;
 
         <Balance<T>>::insert(from.clone(), next_balance);
         <TotalSupply<T>>::put(next_total);
@@ -113,15 +113,15 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
     pub fn _mint(to: T::AccountId, amount: TokenBalance) -> Result {
-        ensure!(!amount.is_zero(), "amount should be non-zero");
+        ensure!(!amount.is_zero(), "Amount should be non-zero");
 
         let old_balance = <Balance<T>>::get(to.clone());
         let next_balance = old_balance
             .checked_add(amount)
-            .ok_or("overflow adding to balance")?;
+            .ok_or("Overflow adding to balance")?;
         let next_total = Self::total_supply()
             .checked_add(amount)
-            .ok_or("overflow adding to total supply")?;
+            .ok_or("Overflow adding to total supply")?;
 
         <Balance<T>>::insert(to.clone(), next_balance);
         <TotalSupply<T>>::put(next_total);
@@ -131,9 +131,9 @@ impl<T: Trait> Module<T> {
 
     fn make_transfer(from: T::AccountId, to: T::AccountId, amount: TokenBalance) -> Result {
         let from_balance = <Balance<T>>::get(&from);
-        ensure!(from_balance >= amount, "user does not have enough tokens");
+        ensure!(from_balance >= amount, "User does not have enough tokens");
         let free_balance = <Balance<T>>::get(&from) - <Locked<T>>::get(&from);
-        ensure!(free_balance >= amount, "not enough because of locked funds");
+        ensure!(free_balance >= amount, "Not enough because of locked funds");
 
         <Balance<T>>::insert(from.clone(), from_balance - amount);
         <Balance<T>>::mutate(to.clone(), |balance| *balance += amount);
@@ -151,7 +151,7 @@ impl<T: Trait> Module<T> {
         let balance = <Locked<T>>::get(account);
         let new_balance = balance
             .checked_sub(amount)
-            .expect("underflow while unlocking");
+            .expect("Underflow while unlocking. Check if user has enough locked funds.");
         match balance - amount {
             0 => <Locked<T>>::remove(account),
             _ => <Locked<T>>::insert(account.clone(), new_balance),
@@ -281,7 +281,7 @@ mod tests {
             assert_eq!(TokenModule::locked(USER2), 0);
             assert_noop!(
                 TokenModule::transfer(Origin::signed(USER2), USER1, 1300),
-                "user does not have enough tokens"
+                "User does not have enough tokens"
             );
         })
     }
