@@ -339,6 +339,9 @@ decl_module! {
             let validator = ensure_signed(origin)?;
             Self::check_validator(validator.clone())?;
 
+            let has_burned = <TransferMessages<T>>::exists(message_id) && <TransferMessages<T>>::get(message_id).status == Status::Confirmed;
+            ensure!(!has_burned, "Failed to cancel. This transfer is already executed.");
+
             let id = <TransferId<T>>::get(message_id);
             Self::update_status(message_id, Status::Canceled, Kind::Transfer)?;
             Self::reopen_for_burn_confirmation(message_id)?;
@@ -1096,6 +1099,87 @@ mod tests {
             ));
             message = BridgeModule::messages(sub_message_id);
             assert_eq!(message.status, Status::Canceled);
+        })
+    }
+    #[test]
+    fn burn_cancel_should_fail() {
+        with_externalities(&mut new_test_ext(), || {
+            let eth_message_id = H256::from(ETH_MESSAGE_ID);
+            let eth_address = H160::from(ETH_ADDRESS);
+            let amount1 = 999 * 10u128.pow(18);
+            let amount2 = 500 * 10u128.pow(18);
+
+            //substrate <----- ETH
+            assert_ok!(BridgeModule::multi_signed_mint(
+                Origin::signed(V2),
+                eth_message_id,
+                eth_address,
+                USER2,
+                amount1
+            ));
+            assert_ok!(BridgeModule::multi_signed_mint(
+                Origin::signed(V1),
+                eth_message_id,
+                eth_address,
+                USER2,
+                amount1
+            ));
+
+            //substrate ----> ETH
+            assert_ok!(BridgeModule::set_transfer(
+                Origin::signed(USER2),
+                eth_address,
+                amount2
+            ));
+
+            let sub_message_id = BridgeModule::message_id_by_transfer_id(1);
+            let get_message = || BridgeModule::messages(sub_message_id);
+
+            let mut message = get_message();
+            assert_eq!(message.status, Status::Withdraw);
+
+            //approval
+            assert_eq!(TokenModule::locked(USER2), 0);
+            assert_ok!(BridgeModule::approve_transfer(
+                Origin::signed(V1),
+                sub_message_id
+            ));
+            assert_ok!(BridgeModule::approve_transfer(
+                Origin::signed(V2),
+                sub_message_id
+            ));
+
+            message = get_message();
+            assert_eq!(message.status, Status::Approved);
+
+            // at this point transfer is in Approved status and are waiting for confirmation
+            // from ethereum side to burn. Funds are locked.
+            assert_eq!(TokenModule::locked(USER2), amount2);
+            assert_eq!(TokenModule::balance_of(USER2), amount1);
+            // once it happends, validators call confirm_transfer
+
+            assert_ok!(BridgeModule::confirm_transfer(
+                Origin::signed(V2),
+                sub_message_id
+            ));
+
+            message = get_message();
+            let transfer = BridgeModule::transfers(1);
+            assert_eq!(message.status, Status::Confirmed);
+            assert_eq!(transfer.open, true);
+            assert_ok!(BridgeModule::confirm_transfer(
+                Origin::signed(V1),
+                sub_message_id
+            ));
+            // assert_ok!(BridgeModule::confirm_transfer(Origin::signed(USER1), sub_message_id));
+            //BurnedMessage(Hash, AccountId, H160, u64) event emitted
+            let tokens_left = amount1 - amount2;
+            assert_eq!(TokenModule::balance_of(USER2), tokens_left);
+            assert_eq!(TokenModule::total_supply(), tokens_left);
+            assert_noop!(BridgeModule::cancel_transfer(
+                Origin::signed(V2),
+                sub_message_id
+            ), "Failed to cancel. This transfer is already executed." );
         })
     }
     #[test]
