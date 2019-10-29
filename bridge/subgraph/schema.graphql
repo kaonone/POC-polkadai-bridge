@@ -8,6 +8,14 @@ type Message @entity {
   ethBlockNumber: BigInt
 }
 
+type Entry @entity {
+  id: ID!
+  ethAddress: String!
+  status: Status!
+  action: Direction!
+  ethBlockNumber: BigInt
+}
+
 enum Status {
   PENDING
   WITHDRAW
@@ -19,4 +27,9 @@ enum Status {
 enum Direction {
   ETH2SUB
   SUB2ETH
+}
+
+enum Action {
+  START
+  STOP
 }

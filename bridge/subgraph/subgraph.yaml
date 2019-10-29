@@ -17,6 +17,8 @@ dataSources:
         - RevertMessage
         - WithdrawMessage
         - ApprovedRelayMessage
+        - BridgeStartedMessage
+        - BridgeStoppedMessage
       abis:
         - name: Contract
           file: ./abis/Contract.json
@@ -29,4 +31,8 @@ dataSources:
           handler: handleWithdrawMessage
         - event: ApprovedRelayMessage(bytes32,address,bytes32,uint256)
           handler: handleApprovedRelayMessage
+        - event: BridgeStartedMessage(bytes32)
+          handler: handleBridgeStartedMessage
+        - event: BridgeStoppedMessage(bytes32)
+          handler: handleBridgeStoppedMessage
       file: ./src/mapping.ts
