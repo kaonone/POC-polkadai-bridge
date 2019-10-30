@@ -3,6 +3,8 @@ import {
   Contract,
   BridgeStoppedMessage,
   BridgeStartedMessage,
+  BridgePausedMessage,
+  BridgeResumedMessage,
   RelayMessage,
   RevertMessage,
   WithdrawMessage,
@@ -57,6 +59,14 @@ export function handleBridgeStoppedMessage(event: BridgeStoppedMessage): void {
   message.action = "STOP"
   message.ethBlockNumber = event.block.number
   message.save()
+}
+
+export function handleBridgePausedMessage(event: BridgePausedMessage): void {
+  changeMessageStatus(event.params.messageID.toHex(), "CONFIRMED")
+}
+
+export function handleBridgeResumedMessage(event: BridgeResumedMessage): void {
+  changeMessageStatus(event.params.messageID.toHex(), "CONFIRMED")
 }
 
 function changeMessageStatus(id: String, status: String): void {

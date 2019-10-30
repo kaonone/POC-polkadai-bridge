@@ -35,4 +35,8 @@ dataSources:
           handler: handleBridgeStartedMessage
         - event: BridgeStoppedMessage(bytes32)
           handler: handleBridgeStoppedMessage
+        - event: BridgePausedMessage(bytes32)
+          handler: handleBridgePausedMessage
+        - event: BridgeResumedMessage(bytes32)
+          handler: handleBridgeResumedMessage
       file: ./src/mapping.ts
