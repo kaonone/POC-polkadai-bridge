@@ -22,6 +22,7 @@ enum Status {
   APPROVED
   CANCELED
   CONFIRMED
+  CONFIRMED_WITHDRAW
 }
 
 enum Direction {

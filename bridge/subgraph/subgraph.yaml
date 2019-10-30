@@ -41,4 +41,6 @@ dataSources:
           handler: handleBridgeResumedMessage
         - event: ConfirmMessage(bytes32,address,bytes32,uint256)
           handler: handleConfirmMessage
+        - event: ConfirmWithdrawMessage(bytes32,address,bytes32,uint256)
+          handler: handleConfirmWithdrawMessage
       file: ./src/mapping.ts
