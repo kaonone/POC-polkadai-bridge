@@ -11,17 +11,18 @@ type MessageId = H256;
 type EthAddress = H160;
 type SubAddress = H256;
 type Amount = U256;
+type BlockNumber = u128;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Events {
-    EthRelayMessage(MessageId, EthAddress, SubAddress, Amount),
-    EthApprovedRelayMessage(MessageId, EthAddress, SubAddress, Amount),
-    EthRevertMessage(MessageId, EthAddress, Amount),
-    EthWithdrawMessage(MessageId),
-    SubRelayMessage(MessageId),
-    SubApprovedRelayMessage(MessageId, SubAddress, EthAddress, Amount),
-    SubBurnedMessage(MessageId, SubAddress, EthAddress, Amount),
-    SubMintedMessage(MessageId),
+pub enum Event {
+    EthRelayMessage(MessageId, EthAddress, SubAddress, Amount, BlockNumber),
+    EthApprovedRelayMessage(MessageId, EthAddress, SubAddress, Amount, BlockNumber),
+    EthRevertMessage(MessageId, EthAddress, Amount, BlockNumber),
+    EthWithdrawMessage(MessageId, BlockNumber),
+    SubRelayMessage(MessageId, BlockNumber),
+    SubApprovedRelayMessage(MessageId, SubAddress, EthAddress, Amount, BlockNumber),
+    SubBurnedMessage(MessageId, SubAddress, EthAddress, Amount, BlockNumber),
+    SubMintedMessage(MessageId, BlockNumber),
 }
 
 #[derive(Debug, Clone)]
@@ -36,15 +37,15 @@ enum Status {
 struct Controller {
     config: Config,
     status: Status,
-    controller_rx: Receiver<Events>,
-    executor_tx: Sender<Events>,
+    controller_rx: Receiver<Event>,
+    executor_tx: Sender<Event>,
     storage: ControllerStorage,
 }
 
 pub fn spawn(
     config: Config,
-    controller_rx: Receiver<Events>,
-    executor_tx: Sender<Events>,
+    controller_rx: Receiver<Event>,
+    executor_tx: Sender<Event>,
 ) -> thread::JoinHandle<()> {
     thread::Builder::new()
         .name("controller".to_string())
@@ -55,23 +56,36 @@ pub fn spawn(
         .expect("can not started controller")
 }
 
-impl Events {
+impl Event {
     pub fn message_id(&self) -> &H256 {
         match self {
-            Self::EthRelayMessage(message_id, _, _, _) => message_id,
-            Self::EthApprovedRelayMessage(message_id, _, _, _) => message_id,
-            Self::EthRevertMessage(message_id, _, _) => message_id,
-            Self::EthWithdrawMessage(message_id) => message_id,
-            Self::SubRelayMessage(message_id) => message_id,
-            Self::SubApprovedRelayMessage(message_id, _, _, _) => message_id,
-            Self::SubBurnedMessage(message_id, _, _, _) => message_id,
-            Self::SubMintedMessage(message_id) => message_id,
+            Self::EthRelayMessage(message_id, _, _, _, _) => message_id,
+            Self::EthApprovedRelayMessage(message_id, _, _, _, _) => message_id,
+            Self::EthRevertMessage(message_id, _, _, _) => message_id,
+            Self::EthWithdrawMessage(message_id, _) => message_id,
+            Self::SubRelayMessage(message_id, _) => message_id,
+            Self::SubApprovedRelayMessage(message_id, _, _, _, _) => message_id,
+            Self::SubBurnedMessage(message_id, _, _, _, _) => message_id,
+            Self::SubMintedMessage(message_id, _) => message_id,
+        }
+    }
+
+    pub fn block_number(&self) -> u128 {
+        match self {
+            Self::EthRelayMessage(_, _, _, _, block_number) => *block_number,
+            Self::EthApprovedRelayMessage(_, _, _, _, block_number) => *block_number,
+            Self::EthRevertMessage(_, _, _, block_number) => *block_number,
+            Self::EthWithdrawMessage(_, block_number) => *block_number,
+            Self::SubRelayMessage(_, block_number) => *block_number,
+            Self::SubApprovedRelayMessage(_, _, _, _, block_number) => *block_number,
+            Self::SubBurnedMessage(_, _, _, _, block_number) => *block_number,
+            Self::SubMintedMessage(_, block_number) => *block_number,
         }
     }
 }
 
 impl Controller {
-    fn new(config: Config, controller_rx: Receiver<Events>, executor_tx: Sender<Events>) -> Self {
+    fn new(config: Config, controller_rx: Receiver<Event>, executor_tx: Sender<Event>) -> Self {
         Controller {
             config,
             status: Status::NotReady,
@@ -94,8 +108,16 @@ impl Controller {
                 Ok(()) => {
                     log::info!("received event: {:?}", event);
                     match status {
-                        Status::Active => executor_tx.send(event).expect("can not sent event"),
-                        Status::NotReady | Status::Paused | Status::Stopped => (),
+                        Status::Active => {
+                            storage.iter_events_queue().cloned().for_each(|event| {
+                                executor_tx.send(event).expect("can not sent event")
+                            });
+                            storage.clear_events_queue();
+                            executor_tx.send(event).expect("can not sent event")
+                        }
+                        Status::NotReady | Status::Paused | Status::Stopped => {
+                            storage.put_event_to_queue(event)
+                        }
                     }
                 }
                 Err(e) => log::debug!("controller storage error: {:?}", e),

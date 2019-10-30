@@ -1,0 +1,11 @@
+query MessagesByStatus($ethBlockNumber: Int!, $status: Status!) {
+  messages(where: {ethBlockNumber_gte: $ethBlockNumber, status: $status}) {
+    id
+    ethAddress
+    subAddress
+    amount
+    status
+    direction
+    ethBlockNumber
+  }
+}

@@ -15,7 +15,7 @@ use std::{
 };
 
 use crate::config::Config;
-use crate::controller::Events;
+use crate::controller::Event;
 use crate::ethereum_transactions;
 use crate::substrate_transactions;
 
@@ -24,10 +24,10 @@ const AMOUNT: u64 = 0;
 #[derive(Debug)]
 struct Executor {
     config: Config,
-    executor_rx: Receiver<Events>,
+    executor_rx: Receiver<Event>,
 }
 
-pub fn spawn(config: Config, executor_rx: Receiver<Events>) -> thread::JoinHandle<()> {
+pub fn spawn(config: Config, executor_rx: Receiver<Event>) -> thread::JoinHandle<()> {
     thread::Builder::new()
         .name("executor".to_string())
         .spawn(move || {
@@ -38,7 +38,7 @@ pub fn spawn(config: Config, executor_rx: Receiver<Events>) -> thread::JoinHandl
 }
 
 impl Executor {
-    fn new(config: Config, executor_rx: Receiver<Events>) -> Self {
+    fn new(config: Config, executor_rx: Receiver<Event>) -> Self {
         Executor {
             config,
             executor_rx,
@@ -65,30 +65,38 @@ impl Executor {
         self.executor_rx.iter().for_each(|event| {
             log::info!("received event: {:?}", event);
             match event {
-                Events::EthRelayMessage(message_id, eth_address, sub_address, amount) => {
-                    handle_eth_relay_message(
-                        &self.config,
-                        runtime.executor(),
-                        web3.clone(),
-                        abi.clone(),
-                        message_id,
-                        eth_address,
-                        sub_address,
-                        amount,
-                    )
-                }
-                Events::EthApprovedRelayMessage(message_id, eth_address, sub_address, amount) => {
-                    handle_eth_approved_relay_message(
-                        &self.config,
-                        runtime.executor(),
-                        sub_api.clone(),
-                        message_id,
-                        eth_address,
-                        sub_address,
-                        amount,
-                    )
-                }
-                Events::EthRevertMessage(message_id, _eth_address, _amount) => {
+                Event::EthRelayMessage(
+                    message_id,
+                    eth_address,
+                    sub_address,
+                    amount,
+                    _block_number,
+                ) => handle_eth_relay_message(
+                    &self.config,
+                    runtime.executor(),
+                    web3.clone(),
+                    abi.clone(),
+                    message_id,
+                    eth_address,
+                    sub_address,
+                    amount,
+                ),
+                Event::EthApprovedRelayMessage(
+                    message_id,
+                    eth_address,
+                    sub_address,
+                    amount,
+                    _block_number,
+                ) => handle_eth_approved_relay_message(
+                    &self.config,
+                    runtime.executor(),
+                    sub_api.clone(),
+                    message_id,
+                    eth_address,
+                    sub_address,
+                    amount,
+                ),
+                Event::EthRevertMessage(message_id, _eth_address, _amount, _block_number) => {
                     handle_eth_revert_message(
                         &self.config,
                         runtime.executor(),
@@ -96,32 +104,44 @@ impl Executor {
                         message_id,
                     )
                 }
-                Events::EthWithdrawMessage(message_id) => handle_eth_withdraw_message(
-                    &self.config,
-                    runtime.executor(),
-                    sub_api.clone(),
-                    message_id,
-                ),
-                Events::SubRelayMessage(message_id) => handle_sub_relay_message(
-                    &self.config,
-                    runtime.executor(),
-                    sub_api.clone(),
-                    message_id,
-                ),
-                Events::SubApprovedRelayMessage(message_id, sub_address, eth_address, amount) => {
-                    handle_sub_approved_relay_message(
+                Event::EthWithdrawMessage(message_id, _block_number) => {
+                    handle_eth_withdraw_message(
                         &self.config,
                         runtime.executor(),
-                        web3.clone(),
-                        abi.clone(),
+                        sub_api.clone(),
                         message_id,
-                        sub_address,
-                        eth_address,
-                        amount,
                     )
                 }
-                Events::SubBurnedMessage(_message_id, _sub_address, _eth_address, _amount) => (),
-                Events::SubMintedMessage(message_id) => handle_sub_minted_message(
+                Event::SubRelayMessage(message_id, _block_number) => handle_sub_relay_message(
+                    &self.config,
+                    runtime.executor(),
+                    sub_api.clone(),
+                    message_id,
+                ),
+                Event::SubApprovedRelayMessage(
+                    message_id,
+                    sub_address,
+                    eth_address,
+                    amount,
+                    _block_number,
+                ) => handle_sub_approved_relay_message(
+                    &self.config,
+                    runtime.executor(),
+                    web3.clone(),
+                    abi.clone(),
+                    message_id,
+                    sub_address,
+                    eth_address,
+                    amount,
+                ),
+                Event::SubBurnedMessage(
+                    _message_id,
+                    _sub_address,
+                    _eth_address,
+                    _amount,
+                    _block_number,
+                ) => (),
+                Event::SubMintedMessage(message_id, _block_number) => handle_sub_minted_message(
                     &self.config,
                     runtime.executor(),
                     web3.clone(),

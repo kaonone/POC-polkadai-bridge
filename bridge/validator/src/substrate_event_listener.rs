@@ -1,7 +1,7 @@
 use log;
 use web3::types::{H160, H256, U256};
 
-use node_runtime::{bridge, bridge::RawEvent as BridgeEvent, Event};
+use node_runtime::{bridge, bridge::RawEvent as BridgeEvent, Event as SubstrateEvent};
 use parity_codec::Decode;
 use primitives;
 use substrate_api_client::{hexstr_to_vec, Api};
@@ -11,7 +11,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 use crate::config::Config;
-use crate::controller::Events;
+use crate::controller::Event;
 
 #[derive(Debug, Clone)]
 struct EventListener {
@@ -20,11 +20,11 @@ struct EventListener {
 }
 
 struct EventHandler {
-    controller_tx: Sender<Events>,
+    controller_tx: Sender<Event>,
     events_out: Receiver<String>,
 }
 
-pub fn spawn(config: Config, controller_tx: Sender<Events>) -> thread::JoinHandle<()> {
+pub fn spawn(config: Config, controller_tx: Sender<Event>) -> thread::JoinHandle<()> {
     thread::Builder::new()
         .name("substrate_event_processor".to_string())
         .spawn(move || {
@@ -64,7 +64,7 @@ impl EventListener {
 }
 
 impl EventHandler {
-    fn new(controller_tx: Sender<Events>, events_out: Receiver<String>) -> Self {
+    fn new(controller_tx: Sender<Event>, events_out: Receiver<String>) -> Self {
         EventHandler {
             controller_tx,
             events_out,
@@ -77,7 +77,7 @@ impl EventHandler {
 
             let unhex = hexstr_to_vec(event);
             let mut er_enc = unhex.as_slice();
-            let events = Vec::<system::EventRecord<Event>>::decode(&mut er_enc);
+            let events = Vec::<system::EventRecord<SubstrateEvent>>::decode(&mut er_enc);
 
             match events {
                 Some(evts) => {
@@ -88,7 +88,9 @@ impl EventHandler {
                             evr.event
                         );
                         match &evr.event {
-                            Event::bridge(bridge_event) => self.handle_bridge_event(bridge_event),
+                            SubstrateEvent::bridge(bridge_event) => {
+                                self.handle_bridge_event(bridge_event)
+                            }
                             _ => log::debug!(
                                 "[substrate] ignoring unsupported module event: {:?}",
                                 evr.event
@@ -105,32 +107,38 @@ impl EventHandler {
         &self,
         event: &BridgeEvent<primitives::sr25519::Public, primitives::H256>,
     ) {
+        const BLOCK_NUMBER: u128 = 0;
+
         log::info!("[substrate] bridge event: {:?}", event);
         match &event {
             bridge::RawEvent::RelayMessage(message_id) => {
-                let event = Events::SubRelayMessage(H256::from_slice(message_id.as_bytes()));
+                let event =
+                    Event::SubRelayMessage(H256::from_slice(message_id.as_bytes()), BLOCK_NUMBER);
                 self.controller_tx.send(event).expect("can not send event");
             }
             bridge::RawEvent::ApprovedRelayMessage(message_id, from, to, amount) => {
-                let event = Events::SubApprovedRelayMessage(
+                let event = Event::SubApprovedRelayMessage(
                     H256::from_slice(message_id.as_bytes()),
                     H256::from_slice(from.as_slice()),
                     H160::from_slice(to.as_bytes()),
                     U256::from(*amount),
+                    BLOCK_NUMBER,
                 );
                 self.controller_tx.send(event).expect("can not send event");
             }
             bridge::RawEvent::BurnedMessage(message_id, from, to, amount) => {
-                let event = Events::SubBurnedMessage(
+                let event = Event::SubBurnedMessage(
                     H256::from_slice(message_id.as_bytes()),
                     H256::from_slice(from.as_slice()),
                     H160::from_slice(to.as_bytes()),
                     U256::from(*amount),
+                    BLOCK_NUMBER,
                 );
                 self.controller_tx.send(event).expect("can not send event");
             }
             bridge::RawEvent::MintedMessage(message_id) => {
-                let event = Events::SubMintedMessage(H256::from_slice(message_id.as_bytes()));
+                let event =
+                    Event::SubMintedMessage(H256::from_slice(message_id.as_bytes()), BLOCK_NUMBER);
                 self.controller_tx.send(event).expect("can not send event");
             }
         }
