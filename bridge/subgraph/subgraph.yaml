@@ -39,6 +39,6 @@ dataSources:
           handler: handleBridgePausedMessage
         - event: BridgeResumedMessage(bytes32)
           handler: handleBridgeResumedMessage
-        - event: ConfirmedTransferMessage(bytes32,address,bytes32,uint256)
-          handler: handleConfirmedTransferMessage
+        - event: ConfirmMessage(bytes32,address,bytes32,uint256)
+          handler: handleConfirmMessage
       file: ./src/mapping.ts

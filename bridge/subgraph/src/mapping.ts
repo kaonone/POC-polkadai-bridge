@@ -9,7 +9,7 @@ import {
   RevertMessage,
   WithdrawMessage,
   ApprovedRelayMessage,
-  ConfirmedTransferMessage,
+  ConfirmeMessage,
   WithdrawTransferCall,
 } from "../generated/Contract/Contract"
 import { Message, Entry } from "../generated/schema"
@@ -44,7 +44,7 @@ export function handleApprovedRelayMessage(event: ApprovedRelayMessage): void {
   changeMessageStatus(event.params.messageID.toHex(), "APPROVED")
 }
 
-export function handleConfirmedTransferMessage(event: ConfirmedTransferMessage): void {
+export function handleConfirmMessage(event: ConfirmeMessage): void {
   changeMessageStatus(event.params.messageID.toHex(), "CONFIRMED")
 }
 
